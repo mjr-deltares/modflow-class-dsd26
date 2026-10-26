@@ -40,6 +40,12 @@ boltons = "*"
 modflow-devtools = ">=1.7.0,!=1.9.0,<2"
 tomli = "*"
 tomli-w = "*"
+# the pre-commit hook: nbstripout clears notebook outputs, codespell fixes
+# spelling, and ruff lints and formats (see .pre-commit-config.yaml)
+ruff = "*"
+nbstripout = "*"
+codespell = "*"
+pre-commit = "*"
 
 [feature.mf6.pypi-dependencies]
 # flopy's develop branch, for the SWI and VSF support the class MODFLOW 6 needs
@@ -53,8 +59,11 @@ setup = { depends-on = [
 ], description = "Install MODFLOW 6, then check that it starts" }
 
 # MODFLOW 6 from the class release, with flopy's classes generated from its DFN
-# files
-install = { depends-on = ["get-mf6"], description = "Install MODFLOW 6" }
+# files, and the git pre-commit hook
+install = { depends-on = [
+    "get-mf6",
+    "pre-commit-install",
+], description = "Install MODFLOW 6 and the git pre-commit hook" }
 get-mf6 = { cmd = "python scripts/get_mf6.py", description = "Install the class MODFLOW 6 and generate the flopy classes for it" }
 update-mf6 = { cmd = "python scripts/get_mf6.py --update", description = "Install the latest class MODFLOW 6 if it is newer" }
 
@@ -65,6 +74,10 @@ verify = { cmd = "python scripts/verify_probe.py mf6 zbud6", description = "Chec
 jupyter = { cmd = "jupyter lab", description = "Start JupyterLab" }
 
 help = { cmd = "pixi task list", description = "List every command" }
+
+# --- contributing ----------------------------------------------------------
+pre-commit-install = { cmd = "pre-commit install", description = "Install the git pre-commit hook that clears notebook outputs, fixes spelling, and lints" }
+pre-commit-run = { cmd = "pre-commit run --all-files", description = "Run the pre-commit hooks on every file" }
 
 # Regenerate flopy's MODFLOW 6 classes after a reinstall of flopy puts back the
 # ones it ships. Quick and offline when nothing has changed.

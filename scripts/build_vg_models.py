@@ -49,7 +49,9 @@ class VoronoiMap:
         self.delr = float(np.atleast_1d(dis.delr.array)[0])
         self.delc = float(np.atleast_1d(dis.delc.array)[0])
         self.ylen = self.nrow * self.delc
-        rc = np.array([self.dis_rowcol(x, y) for x, y in zip(self.xc, self.yc)])
+        rc = np.array(
+            [self.dis_rowcol(x, y) for x, y in zip(self.xc, self.yc, strict=True)]
+        )
         self.ri, self.ci = rc[:, 0], rc[:, 1]
 
         # vertex pairs, and the cells on each side of them
@@ -122,7 +124,9 @@ def stream_reaches(vmap, gwf, first_cell, ncells):
     y_dn = vmap.ylen - (i0 + ncells) * vmap.delc
     res = GridIntersect(gwf.modelgrid).intersect(LineString([(x, y_up), (x, y_dn)]))
     reaches = []
-    for cid, geom, length in zip(res["cellids"], res["ixshapes"], res["lengths"]):
+    for cid, geom, length in zip(
+        res["cellids"], res["ixshapes"], res["lengths"], strict=True
+    ):
         if length > 1e-6:
             ys = [p[1] for p in geom.coords]
             reaches.append((max(ys), min(ys), int(cid), float(length)))
@@ -185,13 +189,15 @@ def head_obs(vmap, obs, wells):
             continuous[fname] = [
                 (name, "head", (cid[0], vmap.cell(x, y)))
                 for name, cid, x, y in zip(
-                    rec["obsname"], rec["id"], wells["x"], wells["y"]
+                    rec["obsname"], rec["id"], wells["x"], wells["y"], strict=True
                 )
             ]
         else:
             continuous[fname] = [
                 (name, otype, (cid[0], vmap.cell_at_dis(cid[1], cid[2])))
-                for name, otype, cid in zip(rec["obsname"], rec["obstype"], rec["id"])
+                for name, otype, cid in zip(
+                    rec["obsname"], rec["obstype"], rec["id"], strict=True
+                )
             ]
     return continuous
 
@@ -489,7 +495,7 @@ def build_advanced_boundaries(vmap, sim_s, gwf, top, idomain):
     ]
     uz_cells = [icpl for icpl in range(vmap.ncpl) if idomain[0, icpl] > 0]
     packagedata = []
-    for n, (icpl, m) in enumerate(zip(uz_cells, uz_src)):
+    for n, (icpl, m) in enumerate(zip(uz_cells, uz_src, strict=True)):
         r = uz_s[m]
         # an ivertcon of -1 is written as 0, no UZF cell below
         packagedata.append(
@@ -576,7 +582,7 @@ def build_base_boundaries(vmap, sim_s, gwf):
     rch_data = s.get_package("rch").stress_period_data.get_data()
     zone = {
         (int(c[1]), int(c[2])): b
-        for c, b in zip(rch_data[0]["cellid"], rch_data[0]["boundname"])
+        for c, b in zip(rch_data[0]["cellid"], rch_data[0]["boundname"], strict=True)
     }
     series = {}
     for b in sorted(set(zone.values())):

@@ -1,0 +1,43 @@
+# Pre-commit hooks for the modflow-class-dsd26 repo.
+#
+# Install once per clone (inside the pixi environment):
+#
+#     pixi run pre-commit-install
+#
+# On every `git commit` the staged files are:
+#   1. stripped of notebook outputs and execution counts (nbstripout; the
+#      notebooks under examples/notebooks/),
+#   2. spell-checked and auto-corrected (codespell), then
+#   3. lint-fixed and formatted with ruff.
+#
+# These hooks use pre-commit's own managed tool environments (not the pixi env),
+# so `git commit` works from any Git client without the pixi environment
+# activated. Tool configuration comes from ruff.toml and .codespellrc. Bump the
+# pinned versions with `pixi run pre-commit autoupdate`.
+#
+# Run against everything with:
+#
+#     pixi run pre-commit-run
+repos:
+  - repo: https://github.com/kynan/nbstripout
+    rev: "0.9.1"
+    hooks:
+      - id: nbstripout
+        files: ^examples/notebooks/.*\.ipynb$
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.2
+    hooks:
+      - id: codespell
+        # --write-changes auto-corrects typos (config in .codespellrc)
+        args: [--write-changes]
+        files: (\.pyi?$|^examples/notebooks/.*\.ipynb$)
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        files: (\.pyi?$|^examples/notebooks/.*\.ipynb$)
+      - id: ruff-format
+        files: (\.pyi?$|^examples/notebooks/.*\.ipynb$)
