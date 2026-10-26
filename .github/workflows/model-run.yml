@@ -1,0 +1,80 @@
+name: Class environment model run
+# Installs the class environment the way a student does and runs the coastal
+# synthetic-valley base model with its mf6, on each platform the class uses.
+concurrency:
+  group: model-run-${{ github.ref }}
+  cancel-in-progress: true
+on:
+  pull_request:
+    paths:
+      - 'pixi.toml'
+      - 'pixi.lock'
+      - 'scripts/**'
+      - 'examples/data/synthetic-valley/synthetic-valley-coastal-base-annual/**'
+      - '.github/workflows/model-run.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'pixi.toml'
+      - 'pixi.lock'
+      - 'scripts/**'
+      - 'examples/data/synthetic-valley/synthetic-valley-coastal-base-annual/**'
+      - '.github/workflows/model-run.yml'
+  # each new preview build release
+  workflow_run:
+    workflows: ['MODFLOW 6 SWI and VSF preview build']
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  MODEL: examples/data/synthetic-valley/synthetic-valley-coastal-base-annual
+jobs:
+  run:
+    name: Run model (${{ matrix.os }})
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # until mjr-deltares/modflow-class-dsd26 has a release, install the one
+      # built in the jdhughes-dev fork
+      - name: Pick the release to install
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view --repo mjr-deltares/modflow-class-dsd26 > /dev/null 2>&1; then
+            owner=mjr-deltares
+          else
+            owner=jdhughes-dev
+            echo "::notice::mjr-deltares/modflow-class-dsd26 has no release; installing from ${owner}"
+          fi
+          echo "MF6_RELEASE_OWNER=${owner}" >> "$GITHUB_ENV"
+
+      - name: Set up pixi and install the locked environment
+        uses: prefix-dev/setup-pixi@v0.10.2
+        with:
+          locked: true
+          cache: true
+
+      - name: Install the class MODFLOW 6
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: pixi run setup
+
+      - name: Run the model
+        working-directory: ${{ env.MODEL }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          pixi run --manifest-path "${GITHUB_WORKSPACE}/pixi.toml" mf6
+          grep -q "Normal termination" mfsim.lst
