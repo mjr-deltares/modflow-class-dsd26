@@ -7,17 +7,10 @@ Class materials and schedule for the 2026 MODFLOW 6 advanced class at the DSD in
 
 The class uses a [pixi](https://pixi.sh) environment with Python, FloPy, and a
 MODFLOW 6 built with the Seawater Intrusion (SWI) and Variably Saturated Flow
-(VSF) packages. In short, after installing git and pixi:
-
-```bash
-git clone https://github.com/mjr-deltares/modflow-class-dsd26.git
-cd modflow-class-dsd26
-pixi run setup
-```
-
-[`INSTALL.md`](INSTALL.md) has the full instructions: installing git and pixi,
-what `pixi run setup` does, using the environment from JupyterLab or VS Code,
-updating it, and the computers it works on. The models used in the class are
+(VSF) packages. Follow [`INSTALL.md`](INSTALL.md) to install it: it covers
+installing git and pixi, downloading the class materials, setting up the
+environment, using it from JupyterLab or VS Code, updating it, and the
+computers it works on. The models used in the class are
 described in [`examples/data/README.md`](examples/data/README.md).
 
 ## MODFLOW 6 preview build
