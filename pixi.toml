@@ -1,0 +1,83 @@
+[workspace]
+name = "modflow-class-dsd26"
+version = "2026.0.0"
+description = "Class materials for the 2026 MODFLOW 6 advanced class at the DSD in Delft"
+channels = ["conda-forge"]
+# the platforms the class MODFLOW 6 release is built for
+platforms = ["win-64", "linux-64", "osx-arm64"]
+
+# The MODFLOW 6 environment is a feature so that other environments (the GMDSI
+# notebooks, later) can sit beside it; the default environment is made from it.
+[environments]
+default = { features = ["mf6"], solve-group = "mf6" }
+
+[feature.mf6.dependencies]
+python = "3.12.*"
+git = "*"
+numpy = "*"
+pandas = ">=2.0"
+matplotlib = "*"
+scipy = "*"
+jupyterlab = "*"
+notebook = "*"
+ipywidgets = "*"
+shapely = ">=2.0"
+rtree = "*"
+pyproj = "*"
+pyshp = "*"
+geopandas = "*"
+rasterio = "*"
+rasterstats = "*"
+xarray = "*"
+netcdf4 = "*"
+pyvista = "*"
+h5py = "*"
+modflowapi = "*"
+# what flopy's generate_classes needs to make the MODFLOW 6 classes from DFN
+# files (flopy's `codegen` extra)
+jinja2 = "*"
+boltons = "*"
+modflow-devtools = ">=1.7.0,!=1.9.0,<2"
+tomli = "*"
+tomli-w = "*"
+
+[feature.mf6.pypi-dependencies]
+# flopy's develop branch, for the SWI and VSF support the class MODFLOW 6 needs
+flopy = { git = "https://github.com/modflowpy/flopy.git", branch = "develop" }
+
+[feature.mf6.tasks]
+# --- getting started -------------------------------------------------------
+setup = { depends-on = [
+    "install",
+    "verify",
+], description = "Install MODFLOW 6 and the other programs, then check that they start" }
+
+# MODFLOW 6 from the class release, with flopy's classes generated from its DFN
+# files, and MODPATH 7, GRIDGEN, and Triangle from MODFLOW-ORG/executables.
+install = { depends-on = [
+    "get-mf6",
+    "get-exes",
+], description = "Install MODFLOW 6 and the other programs" }
+get-mf6 = { cmd = "python scripts/get_mf6.py", description = "Install the class MODFLOW 6 and generate the flopy classes for it" }
+update-mf6 = { cmd = "python scripts/get_mf6.py --update", description = "Install the latest class MODFLOW 6 if it is newer" }
+get-exes = { cmd = "get-modflow :python --subset mp7,gridgen,triangle", description = "Install MODPATH 7, GRIDGEN, and Triangle" }
+
+# Run the programs, which proves they start on this machine.
+verify = { cmd = "python scripts/verify_probe.py mf6 zbud6 mp7 gridgen triangle", description = "Check that MODFLOW 6 and the other programs start" }
+
+# --- day-to-day ------------------------------------------------------------
+jupyter = { cmd = "jupyter lab", description = "Start JupyterLab" }
+
+# Rebuild the coastal Voronoi-grid model from synthetic-valley-vg in
+# jdhughes-dev/mf6-training: pixi run build-coastal-vg --source <path>
+build-coastal-vg = { cmd = "python scripts/build_coastal_vg.py", description = "Rebuild the coastal synthetic-valley Voronoi-grid model" }
+
+help = { cmd = "pixi task list", description = "List every command" }
+
+# Regenerate flopy's MODFLOW 6 classes after a reinstall of flopy puts back the
+# ones it ships. Quick and offline when nothing has changed.
+[feature.mf6.target.unix.activation]
+scripts = ["scripts/activate.sh"]
+
+[feature.mf6.target.win-64.activation]
+scripts = ["scripts/activate.bat"]
