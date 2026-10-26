@@ -64,10 +64,6 @@ verify = { cmd = "python scripts/verify_probe.py mf6 zbud6", description = "Chec
 # --- day-to-day ------------------------------------------------------------
 jupyter = { cmd = "jupyter lab", description = "Start JupyterLab" }
 
-# Rebuild the coastal Voronoi-grid model from synthetic-valley-vg in
-# jdhughes-dev/mf6-training: pixi run build-coastal-vg --source <path>
-build-coastal-vg = { cmd = "python scripts/build_coastal_vg.py", description = "Rebuild the coastal synthetic-valley Voronoi-grid model" }
-
 help = { cmd = "pixi task list", description = "List every command" }
 
 # Regenerate flopy's MODFLOW 6 classes after a reinstall of flopy puts back the
