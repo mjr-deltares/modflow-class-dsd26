@@ -16,6 +16,6 @@ BEGIN packages
   lak6  sv.lak  lak-1
   obs6  sv.obs  obs_2
   mvr6  sv.mvr  mvr
-  GHB6  sv.ghb  ghb-1
+  ghb6  sv.ghb  ghb-1
 END packages
 

@@ -72,6 +72,10 @@ jupyter = { cmd = "jupyter lab", description = "Start JupyterLab" }
 # jdhughes-dev/mf6-training: pixi run build-coastal-vg --source <path>
 build-coastal-vg = { cmd = "python scripts/build_coastal_vg.py", description = "Rebuild the coastal synthetic-valley Voronoi-grid model" }
 
+# Convert a structured model from feet to meters, in place:
+#   pixi run convert-to-si <model folder>
+convert-to-si = { cmd = "python scripts/convert_to_si.py", description = "Convert a structured synthetic-valley model from feet to meters" }
+
 help = { cmd = "pixi task list", description = "List every command" }
 
 # Regenerate flopy's MODFLOW 6 classes after a reinstall of flopy puts back the
