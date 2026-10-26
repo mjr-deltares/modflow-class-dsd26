@@ -69,6 +69,13 @@ pixi run jupyter            # start JupyterLab
 pixi shell                  # a terminal with mf6, python, and flopy ready to run
 ```
 
+To work in VS Code instead, open this folder with **File > Open Folder** after
+`pixi run setup`. `.vscode/settings.json` makes the pixi environment the default
+Python interpreter, so notebooks open with it as their kernel, and VS Code
+offers to install the Python and Jupyter extensions it needs. On Windows the
+interpreter is `.pixi\envs\default\python.exe`, which the setting does not
+point to; pick it once with **Python: Select Interpreter**.
+
 The synthetic-valley models used in the class are in
 `examples/data/synthetic-valley`, in meters and days:
 
