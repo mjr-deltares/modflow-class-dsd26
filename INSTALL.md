@@ -1,7 +1,7 @@
 # Installing the class software
 
 The class uses a [pixi](https://pixi.sh) environment kept inside this folder:
-its own Python, Python packages, and the class MODFLOW 6, which has the
+its own Python, Python packages, PEST++, and the class MODFLOW 6, which has the
 Seawater Intrusion (SWI) and Variably Saturated Flow (VSF) packages that are
 not yet in a MODFLOW 6 release (see
 [MODFLOW 6 preview build](README.md#modflow-6-preview-build)). Nothing is
@@ -100,6 +100,6 @@ Run `pixi run help` to list them in the terminal.
 ## Which computers this works on
 
 The class MODFLOW 6 is built for Windows (Intel or AMD), Linux (Intel or AMD),
-and macOS on Apple silicon (M1 and later). It is not built for Intel Macs or
-ARM Linux, and the environment will not install on them; contact the
-instructors before the class if that is your computer.
+and macOS 14 (Sonoma) or later on Apple silicon (M1 and later). It is not built
+for Intel Macs or ARM Linux, and the environment will not install on them;
+contact the instructors before the class if that is your computer.

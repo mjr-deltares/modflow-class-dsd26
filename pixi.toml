@@ -3,8 +3,13 @@ name = "modflow-class-dsd26"
 version = "2026.0.0"
 description = "Class materials for the 2026 MODFLOW 6 advanced class at the DSD in Delft"
 channels = ["conda-forge"]
-# the platforms the class MODFLOW 6 release is built for
-platforms = ["win-64", "linux-64", "osx-arm64"]
+# the platforms the class MODFLOW 6 release is built for, with macOS 14 or later
+# for the pypestutils wheel
+platforms = [
+    "win-64",
+    "linux-64",
+    { name = "osx-arm64-14", platform = "osx-arm64", macos = "14.0" },
+]
 
 # The MODFLOW 6 environment is a feature so that other environments (the GMDSI
 # notebooks, later) can sit beside it; the default environment is made from it.
@@ -15,7 +20,8 @@ default = { features = ["mf6"], solve-group = "mf6" }
 python = "3.12.*"
 git = "*"
 numpy = "*"
-pandas = ">=2.0"
+# below 3 for pyemu
+pandas = ">=2.3.3,<3"
 matplotlib = "*"
 scipy = "*"
 jupyterlab = "*"
@@ -33,6 +39,8 @@ netcdf4 = "*"
 pyvista = "*"
 h5py = "*"
 modflowapi = "*"
+# PEST++, for parameter estimation and uncertainty analysis
+pestpp = "*"
 # what flopy's generate_classes needs to make the MODFLOW 6 classes from DFN
 # files (flopy's `codegen` extra)
 jinja2 = "*"
@@ -50,6 +58,10 @@ pre-commit = "*"
 [feature.mf6.pypi-dependencies]
 # flopy's develop branch, for the SWI and VSF support the class MODFLOW 6 needs
 flopy = { git = "https://github.com/modflowpy/flopy.git", branch = "develop" }
+# pyEMU from PyPI, since the conda-forge package requires the conda-forge flopy
+# and is older; and the PEST utilities, for pilot points
+pyemu = ">=1.7"
+pypestutils = "*"
 
 [feature.mf6.tasks]
 # --- getting started -------------------------------------------------------
@@ -78,6 +90,10 @@ help = { cmd = "pixi task list", description = "List every command" }
 # --- contributing ----------------------------------------------------------
 pre-commit-install = { cmd = "pre-commit install", description = "Install the git pre-commit hook that clears notebook outputs, fixes spelling, and lints" }
 pre-commit-run = { cmd = "pre-commit run --all-files", description = "Run the pre-commit hooks on every file" }
+
+# pyemu needs an older numpy on Linux
+[feature.mf6.target.linux-64.dependencies]
+numpy = ">=2.2.6,<2.3.2"
 
 # Regenerate flopy's MODFLOW 6 classes after a reinstall of flopy puts back the
 # ones it ships. Quick and offline when nothing has changed.
