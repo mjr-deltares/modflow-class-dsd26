@@ -53,7 +53,8 @@ brought up to date with `git pull`. `pixi run setup`
 3. generates FloPy's MODFLOW 6 classes from the definition files of that
    release, so FloPy has `ModflowGwfswi`, `ModflowGwfvsf`, and the other
    classes for the new packages, and
-4. runs `mf6` and `zbud6` to check that they start on your machine.
+4. runs `mf6`, `zbud6`, and `pestpp-ies` to check that they start on your
+   machine.
 
 If it stops partway, run `pixi run setup` again; it picks up where it stopped.
 Do this before you travel.
@@ -90,10 +91,10 @@ Run `pixi run help` to list them in the terminal.
 
 | Command | What it does |
 |---|---|
-| `setup` | install the class MODFLOW 6, then check that it starts |
+| `setup` | install the class MODFLOW 6, then check that it and PEST++ start |
 | `install` / `get-mf6` | install the class MODFLOW 6 and generate the FloPy classes for it |
 | `update-mf6` | install the latest class MODFLOW 6 if it is newer |
-| `verify` | check that `mf6` and `zbud6` start |
+| `verify` | check that `mf6`, `zbud6`, and `pestpp-ies` start |
 | `jupyter` | start JupyterLab |
 | `help` | list every command |
 
