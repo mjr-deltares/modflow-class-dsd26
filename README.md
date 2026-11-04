@@ -30,9 +30,11 @@ The class uses a [pixi](https://pixi.sh) environment with Python, FloPy,
 PEST++, pyEMU, and a MODFLOW 6 built with the Seawater Intrusion (SWI) and
 Variably Saturated Flow (VSF) packages. Follow [`INSTALL.md`](INSTALL.md) to
 install it: it covers installing git and pixi, downloading the class materials,
-setting up the environment, using it from JupyterLab or VS Code, updating it,
-and the computers it works on. The models used in the class are
-described in [`examples/data/README.md`](examples/data/README.md).
+setting up the environment, using it from JupyterLab or VS Code, updating the
+materials and software with `pixi run update`, and the computers it works on.
+The class notebooks are in [`examples/notebooks`](examples/notebooks), and the
+models they use are described in
+[`examples/data/README.md`](examples/data/README.md).
 
 ## MODFLOW 6 preview build
 

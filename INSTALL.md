@@ -44,7 +44,8 @@ pixi run setup
 ```
 
 Use `git clone` rather than GitHub's **Download ZIP**, so the materials can be
-brought up to date with `git pull`. `pixi run setup`
+brought up to date with `pixi run update` (see [Update](#5-update)).
+`pixi run setup`
 
 1. installs the Python environment (about 2 GB),
 2. installs `mf6`, `libmf6`, `zbud6`, and `mf5to6` from the latest
@@ -63,8 +64,10 @@ Do this before you travel.
 
 ```bash
 pixi run jupyter            # start JupyterLab
-pixi shell                  # a terminal with mf6, python, and flopy ready to run
+pixi shell                  # a terminal with mf6, PEST++, python, and flopy ready to run
 ```
+
+The class notebooks are in `examples/notebooks`.
 
 To work in VS Code instead, open this folder with **File > Open Folder** after
 `pixi run setup`. `.vscode/settings.json` makes the pixi environment the default
@@ -81,9 +84,55 @@ The models used in the class are described in
 Before the class, and when the instructors ask:
 
 ```bash
-git pull
-pixi run update-mf6         # install the latest class MODFLOW 6 if it is newer
+pixi run update
 ```
+
+This downloads the latest class materials, replaces your copy with them, and
+reinstalls the software, including the latest class MODFLOW 6, in case it has
+changed.
+
+### Files you have changed
+
+Running a notebook changes it, because a notebook stores its output inside
+itself. If the update would overwrite a file you changed, it lists the files
+and asks what to do:
+
+```
+[update] these files you changed would be overwritten by the update:
+       M examples/notebooks/synthetic-valley-a-base.ipynb
+
+  What would you like to do?
+    [s] set them aside - keeps your work; put it back with 'pixi run restore'
+    [y] overwrite them - your changes are LOST
+    [n] skip the update - leave everything as it is (default)
+
+  Choice [s/y/N]:
+```
+
+- **`s`** sets your changes aside and updates the materials. Put the changes
+  back on top of the updated files with `pixi run restore`. If you and the
+  update changed the same lines of a file, `restore` writes both versions into
+  the file between `<<<<<<<` and `>>>>>>>` markers, keeps the set-aside copy,
+  and prints the commands to finish either way.
+- **`y`** discards your changes and replaces the files with the latest versions.
+- **`n`**, the default, leaves everything as it is.
+
+Only files that came with the materials count. Model runs, such as
+`examples/notebooks/models`, and other files you created are never touched.
+
+To answer ahead of time:
+
+```bash
+pixi run update --stash         # always keep your changes
+pixi run update --overwrite     # always discard your changes
+pixi run update --no-install    # update the files, skip reinstalling the software
+```
+
+To keep your own work out of the way of updates, copy a notebook to a new name
+or folder before changing it.
+
+`pixi run update` works on the `main` branch; if you have switched to another
+branch, it asks you to switch back first.
 
 ## Commands
 
@@ -93,6 +142,8 @@ Run `pixi run help` to list them in the terminal.
 |---|---|
 | `setup` | install the class MODFLOW 6, then check that it and PEST++ start |
 | `install` / `get-mf6` | install the class MODFLOW 6 and generate the FloPy classes for it |
+| `update` | get the latest class materials and reinstall the software |
+| `restore` | put back the changes an update set aside |
 | `update-mf6` | install the latest class MODFLOW 6 if it is newer |
 | `verify` | check that `mf6`, `zbud6`, and `pestpp-ies` start |
 | `jupyter` | start JupyterLab |

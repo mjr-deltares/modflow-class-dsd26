@@ -77,6 +77,17 @@ install = { depends-on = [
     "pre-commit-install",
 ], description = "Install MODFLOW 6 and the git pre-commit hook" }
 get-mf6 = { cmd = "python scripts/get_mf6.py", description = "Install the class MODFLOW 6 and generate the flopy classes for it" }
+
+# --- updating --------------------------------------------------------------
+# Get the latest class materials and reinstall the software. If files that came
+# with the materials have been changed, update asks whether to set the changes
+# aside, overwrite them, or skip the update; files you created are never
+# touched. Add --stash or --overwrite to answer ahead of time, and --no-install
+# to skip the reinstall:
+#   pixi run update --stash
+update = { cmd = "python scripts/update.py update", description = "Get the latest class materials and software [--stash|--overwrite] [--no-install]" }
+# Put the changes update set aside back on top of the updated files.
+restore = { cmd = "python scripts/update.py restore", description = "Put back the changes an update set aside" }
 update-mf6 = { cmd = "python scripts/get_mf6.py --update", description = "Install the latest class MODFLOW 6 if it is newer" }
 
 # Run the programs, which proves they start on this machine.
