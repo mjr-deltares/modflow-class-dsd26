@@ -4,7 +4,7 @@ The class uses a [pixi](https://pixi.sh) environment kept inside this folder:
 its own Python, Python packages, PEST++, and the class MODFLOW 6, which has the
 Seawater Intrusion (SWI) and Variably Saturated Flow (VSF) packages that are
 not yet in a MODFLOW 6 release (see
-[MODFLOW 6 preview build](README.md#modflow-6-preview-build)). Nothing is
+[The class MODFLOW 6](README.md#the-class-modflow-6)). Nothing is
 installed system-wide, and whatever Python you already use is untouched.
 
 ## 1. Install git
