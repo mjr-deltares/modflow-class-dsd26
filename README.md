@@ -47,7 +47,8 @@ and posted under
 this repository, tagged with the UTC date and time of the build. The build is
 checked nightly and made again whenever either package has changed. Builds are
 posted as pre-releases, and the last 10 are kept. `pixi run setup` installs the
-latest, and `pixi run update-mf6` installs a newer one when there is one.
+latest, and `pixi run update` installs a newer one, along with the latest class
+materials, when there is one.
 
 Outside the class environment, install the latest build with FloPy:
 
