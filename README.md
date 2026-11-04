@@ -43,8 +43,8 @@ unsaturated flow. It is built for Linux, Windows, and macOS on Apple silicon,
 and posted under
 [Releases](https://github.com/mjr-deltares/modflow-class-dsd26/releases) of
 this repository, tagged with the UTC date and time of the build. The build is
-checked nightly and made again whenever either package has changed; the newest
-is marked Latest, and the last 10 are kept. `pixi run setup` installs the
+checked nightly and made again whenever either package has changed. Builds are
+posted as pre-releases, and the last 10 are kept. `pixi run setup` installs the
 latest, and `pixi run update-mf6` installs a newer one when there is one.
 
 Outside the class environment, install the latest build with FloPy:

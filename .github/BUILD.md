@@ -22,7 +22,9 @@ binaries for Linux and Windows built with the Intel classic compiler, binaries f
 macOS on Apple silicon built with gfortran, the tests, and the documentation.
 Each build is posted under [Releases](https://github.com/mjr-deltares/modflow-class-dsd26/releases), tagged with the UTC date
 and time of the build and the two commits (`YYYYMMDD-HHMM-<feat-swi>-<vsf-dev>`);
-the newest is marked Latest, and the last 10 are kept.
+builds are posted as pre-releases, so another release, such as the class
+presentations, can be marked Latest. The last `KEEP_BUILDS` (10) builds are
+kept; other releases are never deleted.
 
 `vsf-dev` is merged into `feat-swi` once, in the first job, by the
 `.github/actions/merge-vsf` action; the merge commit is passed to the build,
