@@ -8,12 +8,13 @@ release also carries the DFN files the build was made from, and flopy's MODFLOW
 Without arguments the script installs mf6 if it is missing and regenerates the
 flopy classes if they no longer match it, which a reinstall of flopy causes;
 it does nothing, and needs no network, when both are in order. ``--update``
-installs the latest release if it is newer, ``--force`` reinstalls it, and
+installs the newest class build if it is newer, ``--force`` reinstalls it, and
 ``--quiet`` (used by the activation hook) prints nothing when nothing is done.
 """
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -26,7 +27,11 @@ from urllib.request import Request, urlopen
 # MF6_RELEASE_OWNER selects a fork's releases, to test a build made there
 OWNER = os.environ.get("MF6_RELEASE_OWNER", "mjr-deltares")
 REPO = "modflow-class-dsd26"
-LATEST = f"https://api.github.com/repos/{OWNER}/{REPO}/releases/latest"
+RELEASES = f"https://api.github.com/repos/{OWNER}/{REPO}/releases?per_page=100"
+
+# the tag of a class build, YYYYMMDD-HHMM-<feat-swi>-<vsf-dev>, which tells it
+# from other releases of this repository, such as the class presentations
+BUILD_TAG = re.compile(r"^\d{8}-\d{4}-[0-9a-f]{7}-[0-9a-f]{7}$")
 
 # what the environment holds, written by this script: the release tag installed,
 # and the flopy install its classes were generated for
@@ -53,14 +58,18 @@ def mf6_installed():
 
 
 def latest_release():
-    """Tag and assets of the latest release, using GITHUB_TOKEN when it is set."""
-    request = Request(LATEST, headers={"Accept": "application/vnd.github+json"})
+    """Tag and assets of the newest class build, using GITHUB_TOKEN when it is set."""
+    request = Request(RELEASES, headers={"Accept": "application/vnd.github+json"})
     token = os.environ.get("GITHUB_TOKEN")
     if token:
         request.add_header("Authorization", f"Bearer {token}")
     with urlopen(request, timeout=60) as response:
-        release = json.load(response)
-    return release["tag_name"], release["assets"]
+        releases = json.load(response)
+    # newest first, by creation date
+    for release in releases:
+        if not release["draft"] and BUILD_TAG.match(release["tag_name"]):
+            return release["tag_name"], release["assets"]
+    sys.exit(f"[get_mf6] {OWNER}/{REPO} has no class MODFLOW 6 build")
 
 
 def install_release(tag, assets, quiet=False):
