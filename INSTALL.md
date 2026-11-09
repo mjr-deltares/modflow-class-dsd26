@@ -136,18 +136,19 @@ branch, it asks you to switch back first.
 
 ## Commands
 
-Run `pixi run help` to list them in the terminal.
+Run `pixi run help` to list them in the terminal, grouped and in the order
+they are used.
 
 | Command | What it does |
 |---|---|
 | `setup` | install the class MODFLOW 6, then check that it and PEST++ start |
 | `install` / `get-mf6` | install the class MODFLOW 6 and generate the FloPy classes for it |
+| `verify` | check that `mf6`, `zbud6`, and `pestpp-ies` start |
 | `update` | get the latest class materials and reinstall the software |
 | `restore` | put back the changes an update set aside |
 | `update-mf6` | install the latest class MODFLOW 6 if it is newer |
-| `verify` | check that `mf6`, `zbud6`, and `pestpp-ies` start |
 | `jupyter` | start JupyterLab |
-| `help` | list every command |
+| `help` | list every command in the order they are used |
 
 ## Which computers this works on
 

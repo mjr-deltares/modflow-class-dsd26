@@ -1,4 +1,4 @@
-name: MODFLOW 6 release
+name: 1a · Build MODFLOW 6 distribution (called by 1)
 # Copy of .github/workflows/release.yml from the feat-swi branch of
 # christianlangevin/modflow6, without the extended Windows build and
 # distribution, building from christianlangevin/modflow6 with the vsf-dev

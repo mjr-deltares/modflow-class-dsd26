@@ -1,4 +1,4 @@
-name: MODFLOW 6 SWI and VSF preview build
+name: 1 · Build class MODFLOW 6 (nightly)
 # Builds the developmode distribution of the feat-swi branch of
 # christianlangevin/modflow6, the SWI Package development branch, with the
 # vsf-dev branch of mjr-deltares/modflow6, the VSF Package development branch,
@@ -114,7 +114,7 @@ jobs:
           fi
 
   make_dist:
-    name: Make developmode distribution
+    name: Build MODFLOW 6
     needs: check
     if: needs.check.outputs.build == 'true'
     uses: ./.github/workflows/release.yml

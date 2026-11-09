@@ -48,8 +48,9 @@ cp -R .git/rr-cache/. ../.github/rr-cache/
 ```
 
 The extended Windows build (parallel and NetCDF) is left out. To do that, the
-workflow calls a copy of `.github/workflows/release.yml` from `feat-swi` with
-the extended entries removed from the build and distribution matrices,
+workflow calls a copy of `.github/workflows/release.yml` from `feat-swi`,
+renamed to `1a · Build MODFLOW 6 distribution (called by 1)`, with the
+extended entries removed from the build and distribution matrices,
 `${{ github.repository_owner }}/modflow6` replaced by `christianlangevin/modflow6`,
 and steps added to check out the merge commit from the bundle. If the release workflow on the
 branch changes, refresh the copy:

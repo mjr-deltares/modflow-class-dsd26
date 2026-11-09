@@ -1,4 +1,4 @@
-name: Calibration notebooks
+name: 3 · Run calibration notebooks
 # Installs the class environment with pixi and runs the PEST++ IES notebook
 # (f) of the synthetic valley, shortened to two IES iterations on 4 workers. Notebook f runs
 # the PEST interface that notebook e builds, so e runs first.
@@ -31,7 +31,7 @@ env:
   NOTEBOOKS: examples/notebooks
 jobs:
   ies:
-    name: PEST++ IES notebook
+    name: Run PEST++ IES (notebooks e and f)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:

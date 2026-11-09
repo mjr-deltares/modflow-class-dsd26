@@ -78,6 +78,9 @@ install = { depends-on = [
 ], description = "Install MODFLOW 6 and the git pre-commit hook" }
 get-mf6 = { cmd = "python scripts/get_mf6.py", description = "Install the class MODFLOW 6 and generate the flopy classes for it" }
 
+# Run the programs, which proves they start on this machine.
+verify = { cmd = "python scripts/verify_probe.py mf6 zbud6 pestpp-ies", description = "Check that MODFLOW 6 and PEST++ start" }
+
 # --- updating --------------------------------------------------------------
 # Get the latest class materials and reinstall the software. If files that came
 # with the materials have been changed, update asks whether to set the changes
@@ -90,13 +93,10 @@ update = { cmd = "python scripts/update.py update", description = "Get the lates
 restore = { cmd = "python scripts/update.py restore", description = "Put back the changes an update set aside" }
 update-mf6 = { cmd = "python scripts/get_mf6.py --update", description = "Install the latest class MODFLOW 6 if it is newer" }
 
-# Run the programs, which proves they start on this machine.
-verify = { cmd = "python scripts/verify_probe.py mf6 zbud6 pestpp-ies", description = "Check that MODFLOW 6 and PEST++ start" }
-
 # --- day-to-day ------------------------------------------------------------
 jupyter = { cmd = "jupyter lab", description = "Start JupyterLab" }
 
-help = { cmd = "pixi task list", description = "List every command" }
+help = { cmd = "python scripts/help.py", description = "List every command in the order they are used" }
 
 # --- contributing ----------------------------------------------------------
 pre-commit-install = { cmd = "pre-commit install", description = "Install the git pre-commit hook that clears notebook outputs, fixes spelling, and lints" }

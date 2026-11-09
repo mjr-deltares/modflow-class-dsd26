@@ -1,4 +1,4 @@
-name: Class environment model run
+name: 2 · Run class model (Windows, macOS, Linux)
 # Installs the class environment the way a student does and runs the coastal
 # synthetic-valley base model with its mf6, on each platform the class uses.
 concurrency:
@@ -23,7 +23,7 @@ on:
       - '.github/workflows/model-run.yml'
   # each new class MODFLOW 6 release
   workflow_run:
-    workflows: ['MODFLOW 6 SWI and VSF preview build']
+    workflows: ['1 · Build class MODFLOW 6 (nightly)']
     types: [completed]
   workflow_dispatch:
 permissions:
