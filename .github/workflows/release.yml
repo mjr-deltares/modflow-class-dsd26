@@ -107,11 +107,11 @@ jobs:
             compiler: ${{ inputs.compiler_toolchain }}
             version: ${{ inputs.compiler_version }}
             extended: false
-          - os: macos-14
+          - os: macos-15
             compiler: gcc
             version: 13
             extended: false
-            xcode-version: '15.1.0'
+            xcode-version: '16.4'
           - os: windows-2022
             compiler: ${{ inputs.compiler_toolchain }}
             version: ${{ inputs.compiler_version }}
@@ -681,7 +681,7 @@ jobs:
           - os: ubuntu-22.04
             compiler: ${{ inputs.compiler_toolchain }}
             version: ${{ inputs.compiler_version }}
-          - os: macos-14
+          - os: macos-15
             compiler: gcc
             version: 13
           - os: windows-2022
