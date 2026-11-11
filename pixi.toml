@@ -95,6 +95,7 @@ update-mf6 = { cmd = "python scripts/get_mf6.py --update", description = "Instal
 
 # --- day-to-day ------------------------------------------------------------
 jupyter = { cmd = "jupyter lab", description = "Start JupyterLab" }
+code = { cmd = "code .", description = "Open this folder in VS Code" }
 
 help = { cmd = "python scripts/help.py", description = "List every command in the order they are used" }
 

@@ -153,6 +153,7 @@ they are used.
 | `restore` | put back the changes an update set aside |
 | `update-mf6` | install the latest class MODFLOW 6 if it is newer |
 | `jupyter` | start JupyterLab |
+| `code` | open this folder in VS Code (needs the `code` command on the PATH) |
 | `help` | list every command in the order they are used |
 
 ## Which computers this works on
