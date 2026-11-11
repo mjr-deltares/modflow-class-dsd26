@@ -60,6 +60,11 @@ brought up to date with `pixi run update` (see [Update](#5-update)).
 If it stops partway, run `pixi run setup` again; it picks up where it stopped.
 Do this before you travel.
 
+If the environment was installed another way, such as `pixi install`, the first
+`pixi run` or `pixi shell` installs MODFLOW 6 and generates the FloPy classes.
+This takes a few seconds and prints nothing; run `pixi run setup` to check that
+everything starts.
+
 ## 4. Use the environment
 
 ```bash

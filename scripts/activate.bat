@@ -1,6 +1,6 @@
 @echo off
-rem Activation hook (Windows): regenerate flopy's MODFLOW 6 classes if a flopy
-rem reinstall replaced them. Only once mf6 is installed, and never fails activation.
-if exist "%CONDA_PREFIX%\share\modflow-class-dsd26\release" (
-  python "%PIXI_PROJECT_ROOT%\scripts\get_mf6.py" --quiet || echo [get_mf6] WARNING: could not update the flopy classes; run "pixi run get-mf6 --force". 1>&2
-)
+rem Activation hook (Windows): install the class MODFLOW 6 the first time the
+rem environment is used, and afterwards regenerate flopy's MODFLOW 6 classes if a
+rem flopy reinstall replaced them. pixi does not show the hook's output, and the
+rem hook never fails activation; a failed install is retried on the next use.
+python "%PIXI_PROJECT_ROOT%\scripts\get_mf6.py" --quiet || echo [get_mf6] WARNING: could not install MODFLOW 6 or update the flopy classes; run "pixi run get-mf6 --force". 1>&2
