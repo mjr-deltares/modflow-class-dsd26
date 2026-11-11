@@ -7,9 +7,10 @@ release also carries the DFN files the build was made from, and flopy's MODFLOW
 
 Without arguments the script installs mf6 if it is missing and regenerates the
 flopy classes if they no longer match it, which a reinstall of flopy causes;
-it does nothing, and needs no network, when both are in order. ``--update``
-installs the newest class build if it is newer, ``--force`` reinstalls it, and
-``--quiet`` (used by the activation hook) prints nothing when nothing is done.
+when both are in order it only reports the installed release, and needs no
+network. ``--update`` installs the newest class build if it is newer,
+``--force`` reinstalls it, and ``--quiet`` (used by the activation hook) prints
+nothing when nothing is done.
 """
 
 import json
@@ -141,6 +142,8 @@ def main():
             force = True
         else:
             log(f"mf6 from release {tag} is already installed", quiet)
+    else:
+        log(f"mf6 from release {installed} is installed", quiet)
     sync_classes(installed, force=force, quiet=quiet)
     return 0
 
