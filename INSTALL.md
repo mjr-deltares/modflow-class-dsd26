@@ -78,10 +78,11 @@ To work in VS Code instead, open this folder with `pixi run code`, which first
 installs MODFLOW 6 if it is missing. Opened with **File > Open Folder**, VS Code
 does not install it, so run `pixi run setup` before opening the folder that way.
 `.vscode/settings.json` makes the pixi environment the default Python
-interpreter, so notebooks open with it as their kernel, and VS Code offers to
-install the Python and Jupyter extensions it needs. On Windows the interpreter
-is `.pixi\envs\default\python.exe`, which the setting does not point to; pick it
-once with **Python: Select Interpreter**.
+interpreter, so notebooks open with it as their kernel. VS Code offers to
+install the extensions it needs: Python, Jupyter, and pixi-code, which lists the
+pixi environment in the interpreter and kernel pickers. On Windows the setting
+does not point to the interpreter, `.pixi\envs\default\python.exe`; pick the
+pixi environment once with **Python: Select Interpreter**.
 
 The models used in the class are described in
 [`examples/data/README.md`](examples/data/README.md).
