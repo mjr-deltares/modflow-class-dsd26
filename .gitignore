@@ -219,3 +219,6 @@ __marimo__/
 
 # notebook model workspaces and saved runs
 examples/notebooks/models/
+
+# local presentation files
+/presentations/
