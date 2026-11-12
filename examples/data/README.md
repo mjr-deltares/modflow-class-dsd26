@@ -15,8 +15,8 @@ Every model works in meters and days and has five layers:
 
 - layers 1 and 2 are the upper aquifer,
 - layer 3 is a clay confining unit, active only where the clay is present;
-  elsewhere its cells are vertical pass-through cells (`idomain` of -1) that
-  connect layer 2 directly to layer 4, and
+  elsewhere its cells are vertical pass-through cells (`idomain` of -1) with
+  no thickness, which connect layer 2 directly to layer 4, and
 - layers 4 and 5 are the lower aquifer.
 
 The simulation starts with a 16,071-day steady-state stress period, which gives

@@ -281,6 +281,9 @@ def build(kind, grid_ws, dest):
     # layer 3 is the clay; elsewhere its cells pass flow between layers 2 and 4
     clay = truth["clay_location"].values[vmap.ri, vmap.ci] == 1
     idomain[2, ~clay] = -1
+    # mf6 starts layer 4 at the bottom of layer 3, so a pass-through cell takes
+    # the bottom of layer 2 and has no thickness
+    botm[2, ~clay] = botm[1, ~clay]
 
     k11 = truth_k(vmap, truth, nlay)
     k11[2, clay] = truth["clay_kv"].values[vmap.ri, vmap.ci][clay]
