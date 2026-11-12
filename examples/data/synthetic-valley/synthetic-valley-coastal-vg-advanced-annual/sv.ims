@@ -1,6 +1,6 @@
 BEGIN options
   PRINT_OPTION  summary
-  COMPLEXITY  complex
+  COMPLEXITY  moderate
 END options
 
 BEGIN nonlinear
