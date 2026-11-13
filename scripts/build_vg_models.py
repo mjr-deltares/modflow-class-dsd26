@@ -2,10 +2,13 @@
 """Build the coastal synthetic-valley models on a Voronoi grid.
 
 Each model is the structured model of the same kind moved onto the Voronoi
-cells: arrays and boundaries come from the DIS cell holding each cell center,
-the hydraulic conductivity and clay from the truth dataset in
-examples/data/synthetic-valley/data. Layer 3 is active only where the clay is.
-Run inside the pixi environment, e.g.
+cells. Most inputs and boundaries come from the structured cell that contains
+each Voronoi cell center. The hydraulic conductivity and the clay come from the
+truth dataset in examples/data/synthetic-valley/data, and the land surface, the
+lake, and where runoff goes come from the land surface raster there, in the same
+way as in scripts/update_structured_models.py, which is run first. Layer 3 is
+active only where the clay is. Both models start from their own steady-state
+heads. Run inside the pixi environment, e.g.
 
     python scripts/build_vg_models.py --grid <dir with sv.disv>
 """
@@ -22,6 +25,19 @@ from flopy.utils.gridintersect import GridIntersect
 from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import distance_transform_edt
 from shapely.geometry import LineString
+from sv_surface import (
+    LAKE,
+    LAKE_EXTENT,
+    LAKE_FLOOR,
+    LAKE_K,
+    LAKE_K33,
+    Surface,
+    drain_package,
+    drain_rows,
+    lake_package,
+    mover_records,
+    start_from_steady_state,
+)
 
 DATA_ROOT = pl.Path(__file__).resolve().parents[1] / "examples/data/synthetic-valley"
 TRUTH = DATA_ROOT / "data/synthetic_valley_truth.nc"
@@ -34,66 +50,68 @@ MIN_REACH_LENGTH = 5.0
 
 
 class VoronoiMap:
-    """A Voronoi grid and the structured cell holding each of its cell centers."""
+    """A Voronoi grid, and the structured cell that contains each Voronoi cell center.
 
-    def __init__(self, disv, dis):
-        self.vertices = disv.vertices.array
-        self.cell2d = disv.cell2d.array
-        self.ncpl = disv.ncpl.data
-        self.xc = np.array([r[1] for r in self.cell2d])
-        self.yc = np.array([r[2] for r in self.cell2d])
-        self.vxy = {int(v[0]): (float(v[1]), float(v[2])) for v in self.vertices}
-        self.cverts = [[int(r[4 + i]) for i in range(int(r[3]))] for r in self.cell2d]
+    ``grid`` and ``structured`` are the FloPy model grids of the two models.
+    """
 
-        self.nrow, self.ncol = dis.nrow.data, dis.ncol.data
-        self.delr = float(np.atleast_1d(dis.delr.array)[0])
-        self.delc = float(np.atleast_1d(dis.delc.array)[0])
+    def __init__(self, grid, structured):
+        self.grid = grid
+        self.ncpl = grid.ncpl
+        self.xc, self.yc = grid.xcellcenters, grid.ycellcenters
+        self.structured = structured
+        self.nrow, self.ncol = structured.nrow, structured.ncol
+        self.delr = float(structured.delr[0])
+        self.delc = float(structured.delc[0])
         self.ylen = self.nrow * self.delc
         rc = np.array(
             [self.dis_rowcol(x, y) for x, y in zip(self.xc, self.yc, strict=True)]
         )
         self.ri, self.ci = rc[:, 0], rc[:, 1]
 
-        # vertex pairs, and the cells on each side of them
-        self.edges = {}
-        for icpl, iv in enumerate(self.cverts):
-            for n in range(len(iv)):
-                key = tuple(sorted((iv[n - 1], iv[n])))
-                self.edges.setdefault(key, []).append(icpl)
-
     def dis_rowcol(self, x, y):
-        """(row, col) of the structured cell holding a point."""
+        """(row, column) of the structured cell that contains a point.
+
+        Many Voronoi cell centers are on the edge of the model, where FloPy's
+        StructuredGrid.intersect() finds no cell, so the row and column are
+        counted from the cell size.
+        """
         i = min(max(int((self.ylen - y) // self.delc), 0), self.nrow - 1)
         j = min(max(int(x // self.delr), 0), self.ncol - 1)
         return i, j
 
     def dis_center(self, i, j):
-        return (j + 0.5) * self.delr, self.ylen - (i + 0.5) * self.delc
+        return self.structured.xcellcenters[i, j], self.structured.ycellcenters[i, j]
 
     def cell(self, x, y):
-        """Voronoi cell holding a point."""
-        return int(np.argmin((self.xc - x) ** 2 + (self.yc - y) ** 2))
+        """The Voronoi cell that contains a point."""
+        return int(self.grid.intersect(x, y))
 
     def cell_at_dis(self, i, j):
         return self.cell(*self.dis_center(i, j))
 
     def layers(self, arr):
-        """A structured (nlay, nrow, ncol) array on the Voronoi cells."""
+        """Values of a structured (layer, row, column) array at the Voronoi cells."""
         return np.array([arr[k][self.ri, self.ci] for k in range(arr.shape[0])])
 
-    def edge_geometry(self, key, icpl):
-        """(length, distance from the cell center to the edge)."""
-        (x0, y0), (x1, y1) = self.vxy[key[0]], self.vxy[key[1]]
-        length = np.hypot(x1 - x0, y1 - y0)
-        dist = (
-            abs((x1 - x0) * (y0 - self.yc[icpl]) - (x0 - self.xc[icpl]) * (y1 - y0))
-            / length
+    def coast(self):
+        """The length of coastline, along the southern edge, in each cell on it."""
+        xmin, xmax, _, _ = self.grid.extent
+        hits = GridIntersect(self.grid).intersect(
+            LineString([(xmin, 0.0), (xmax, 0.0)])
         )
-        return length, dist
+        return {
+            int(icpl): float(length)
+            for icpl, length in zip(hits["cellids"], hits["lengths"], strict=True)
+            if length > 0.0
+        }
 
 
 def truth_k(vmap, truth, nlay):
-    """Truth K interpolated in log space between the structured cell centers."""
+    """Hydraulic conductivity of the truth at the Voronoi cell centers.
+
+    The logarithm of K is interpolated between the structured cell centers.
+    """
     tx = truth["x"].values
     ty = truth["y"].values[::-1]
     pts = np.column_stack(
@@ -102,7 +120,7 @@ def truth_k(vmap, truth, nlay):
     k11 = np.empty((nlay, vmap.ncpl))
     for k in range(nlay):
         kt = truth[f"k1_layer{k + 1}"].values[::-1]
-        # K is undefined under the lake, so those cells take their nearest value
+        # the truth has no K under its lake, so those cells take the nearest value
         missing = np.isnan(kt)
         if missing.any():
             _, (ii, jj) = distance_transform_edt(missing, return_indices=True)
@@ -113,7 +131,7 @@ def truth_k(vmap, truth, nlay):
 
 
 def stream_reaches(vmap, gwf, first_cell, ncells):
-    """(top y, bottom y, cell, length) of the reaches, upstream first.
+    """(top y, bottom y, cell, length) of each stream reach, upstream first.
 
     The structured stream runs down the center of one column from the top of
     ``first_cell`` for ``ncells`` cells.
@@ -142,56 +160,48 @@ def stream_reaches(vmap, gwf, first_cell, ncells):
 
 
 def linear_in_y(vmap, cellids, values):
-    """Coefficients of a value that is linear in y through structured cell centers."""
+    """Straight-line fit, in the north-south direction, of a value at structured cell centers."""
     y = np.array([vmap.ylen - (c[1] + 0.5) * vmap.delc for c in cellids])
     return np.polyfit(y, values, 1)
 
 
 def coastal_ghb(vmap, top, botm, idomain, k11, skip):
-    """GHB stress-period data at sea level along the southern edge.
+    """General-head boundary cells at sea level along the southern edge.
 
     The conductance per unit length of coastline is the structured models'.
     """
     flow_length = 0.5 * vmap.delc
-    spd = {}
+    coast = vmap.coast()
+    rows = []
     for k in range(botm.shape[0]):
-        for key, cells in vmap.edges.items():
-            (x0, y0), (x1, y1) = vmap.vxy[key[0]], vmap.vxy[key[1]]
-            if len(cells) != 1 or abs(y0) > 1e-6 or abs(y1) > 1e-6:
-                continue
-            icpl = cells[0]
+        for icpl in sorted(coast):
             if icpl == skip or idomain[k, icpl] <= 0:
                 continue
             cell_top = top[icpl] if k == 0 else botm[k - 1, icpl]
             cell_bot = botm[k, icpl]
-            cond = k11[k, icpl] * abs(x1 - x0) * (cell_top - cell_bot) / flow_length
-            if (k, icpl) in spd:
-                spd[(k, icpl)][2] += cond
-                continue
+            cond = k11[k, icpl] * coast[icpl] * (cell_top - cell_bot) / flow_length
             elevation = 0.5 * (min(cell_top, 0.0) + cell_bot)
-            spd[(k, icpl)] = [
-                (k, icpl),
-                0.0,
-                cond,
-                elevation,
-                SEAWATER_CONCENTRATION,
-                "coast",
-            ]
-    return [tuple(v) for v in spd.values()]
+            rows.append(
+                ((k, icpl), 0.0, cond, elevation, SEAWATER_CONCENTRATION, "coast")
+            )
+    return rows
 
 
 def head_obs(vmap, obs, wells):
-    """Head observations: wells at their surveyed locations, the rest at the
-    structured cell centers."""
+    """Head observations: the observation wells at their surveyed locations,
+    the others at the structured cell centers.
+
+    ``wells`` lists each observation well by the row and column, counted from 1,
+    of the structured cell it is in.
+    """
+    xy = wells.set_index(["row", "column"])
     continuous = {}
     for fname, rec in obs.continuous.get_data().items():
         if fname in ("sv.gwf.aq.csv", "sv.gwf.wt.csv"):
-            continuous[fname] = [
-                (name, "head", (cid[0], vmap.cell(x, y)))
-                for name, cid, x, y in zip(
-                    rec["obsname"], rec["id"], wells["x"], wells["y"], strict=True
-                )
-            ]
+            continuous[fname] = []
+            for name, cid in zip(rec["obsname"], rec["id"], strict=True):
+                x, y = xy.loc[(cid[1] + 1, cid[2] + 1), ["x", "y"]]
+                continuous[fname].append((name, "head", (cid[0], vmap.cell(x, y))))
         else:
             continuous[fname] = [
                 (name, otype, (cid[0], vmap.cell_at_dis(cid[1], cid[2])))
@@ -203,13 +213,13 @@ def head_obs(vmap, obs, wells):
 
 
 def layered(arr):
-    """Per-layer values, with a constant for each uniform layer."""
+    """Values by layer, with a single number for a layer that has one value."""
     return [a.flat[0].item() if np.all(a == a.flat[0]) else a for a in arr]
 
 
 def period_values(data, nper, fields):
-    """{field: value in each period} for period data that is uniform over its
-    rows, carried forward through periods with no data."""
+    """The value of each field in each stress period, for input that is the same
+    in every cell; a period without input keeps the previous period's values."""
     values = {f: [] for f in fields}
     current = None
     for kper in range(nper):
@@ -227,7 +237,7 @@ def period_values(data, nper, fields):
 
 
 def stepwise_ts(package, filename, sim_s, series):
-    """Attach a stepwise time series holding {name: value in each period}."""
+    """Add a time series that holds each value constant through its stress period."""
     perlen = sim_s.tdis.perioddata.array["perlen"]
     times = np.concatenate([[0.0], np.cumsum(perlen)])
     names = list(series)
@@ -244,7 +254,7 @@ def stepwise_ts(package, filename, sim_s, series):
 
 
 def wel_spd(vmap, wel):
-    """WEL stress-period data with each well at its structured cell center."""
+    """Pumping well input with each well at the center of its structured cell."""
     spd = {}
     for kper, d in wel.stress_period_data.get_data().items():
         rows = []
@@ -264,36 +274,61 @@ def build(kind, grid_ws, dest):
     s = sim_s.get_model()
     dis = s.dis
     nlay = dis.nlay.data
-    disv_g = (
-        flopy.mf6.MFSimulation.load(
-            sim_ws=grid_ws, verbosity_level=0, load_only=["disv"]
-        )
-        .get_model()
-        .disv
-    )
-    vmap = VoronoiMap(disv_g, dis)
+    grid_model = flopy.mf6.MFSimulation.load(
+        sim_ws=grid_ws, verbosity_level=0, load_only=["disv"]
+    ).get_model()
+    vertices = grid_model.disv.vertices.array
+    cell2d = grid_model.disv.cell2d.array
+    vmap = VoronoiMap(grid_model.modelgrid, s.modelgrid)
     truth = xr.open_dataset(TRUTH)
     wells = pd.read_csv(WELL_INFO)
 
-    top = dis.top.array[vmap.ri, vmap.ci]
+    surface = Surface()
+    members = surface.members(vmap.grid)
+    top, lake, bed = surface.cells(members)
     botm = vmap.layers(dis.botm.array)
     idomain = vmap.layers(dis.idomain.array)
-    # layer 3 is the clay; elsewhere its cells pass flow between layers 2 and 4
+    idomain[0] = 1
+    # layer 3 is the clay; where there is no clay its cells pass water straight
+    # between layers 2 and 4
     clay = truth["clay_location"].values[vmap.ri, vmap.ci] == 1
     idomain[2, ~clay] = -1
-    # mf6 starts layer 4 at the bottom of layer 3, so a pass-through cell takes
-    # the bottom of layer 2 and has no thickness
+    # MODFLOW 6 starts layer 4 at the bottom of layer 3, so a pass-through cell
+    # takes the bottom of layer 2 and has no thickness
     botm[2, ~clay] = botm[1, ~clay]
 
     k11 = truth_k(vmap, truth, nlay)
     k11[2, clay] = truth["clay_kv"].values[vmap.ri, vmap.ci][clay]
-    # an active lake in layer 1 keeps the structured model's high K
-    lake = truth["lake_location"].values[vmap.ri, vmap.ci] == 1
-    k_s = vmap.layers(s.npf.k.array)
-    k11[0, lake] = k_s[0, lake]
+    k33 = vmap.layers(s.npf.k33.array)
+    k_s = s.npf.k.array[0]
+    k33[0] = float(np.median(s.npf.k33.array[0][k_s < 0.1 * LAKE_K]))
+    icelltype = np.zeros((nlay, vmap.ncpl), dtype=int)
+    icelltype[0] = 1
+    if kind == "base":
+        # the top of the lake cells is the lake surface at its highest level
+        top[lake] = LAKE_EXTENT
+        k11[0, lake], k33[0, lake] = LAKE_K, LAKE_K33
+        # the lake cells are treated as always saturated; with their very high
+        # hydraulic conductivity, letting their saturated thickness follow the
+        # head makes the steady-state solution fail to converge
+        icelltype[0, lake] = 0
+        to_layer2 = np.zeros(vmap.ncpl, dtype=bool)
+    else:
+        # the lake sits on the aquifer; where its bed is at the bottom of layer
+        # 1, layer 1 has no thickness and passes water straight to layer 2
+        to_layer2 = lake & (bed - LAKE_FLOOR <= 1.0e-6)
+        to_layer1 = lake & ~to_layer2
+        top[to_layer1] = bed[to_layer1]
+        top[to_layer2] = LAKE_FLOOR
+        idomain[0, to_layer2] = -1
 
-    sim = flopy.mf6.MFSimulation(sim_name="sv", sim_ws=dest, memory_print_option=None)
-    # the default precision rounds the period data the structured models carry
+    # no FloPy header lines, so a rebuild changes only the files whose input
+    # changes
+    sim = flopy.mf6.MFSimulation(
+        sim_name="sv", sim_ws=dest, memory_print_option=None, write_headers=False
+    )
+    # write more digits than FloPy's default, which would round the structured
+    # models' stress values
     sim.simulation_data.float_precision = 12
     sim.simulation_data.float_characters = 20
     flopy.mf6.ModflowTdis(
@@ -311,21 +346,21 @@ def build(kind, grid_ws, dest):
         length_units="meters",
         nlay=nlay,
         ncpl=vmap.ncpl,
-        nvert=len(vmap.vertices),
+        nvert=len(vertices),
         top=top,
         botm=layered(botm),
         idomain=layered(idomain),
-        vertices=vmap.vertices.tolist(),
-        cell2d=vmap.cell2d.tolist(),
+        vertices=vertices.tolist(),
+        cell2d=cell2d.tolist(),
     )
     flopy.mf6.ModflowGwfic(gwf, strt=vmap.layers(s.ic.strt.array))
     flopy.mf6.ModflowGwfnpf(
         gwf,
         save_specific_discharge=True,
         k33overk=True,
-        icelltype=layered(vmap.layers(s.npf.icelltype.array)),
+        icelltype=layered(icelltype),
         k=k11,
-        k33=layered(vmap.layers(s.npf.k33.array)),
+        k33=layered(k33),
     )
     flopy.mf6.ModflowGwfsto(
         gwf,
@@ -336,10 +371,13 @@ def build(kind, grid_ws, dest):
         transient={1: True},
     )
 
+    kv = k11[0] * k33[0]
     if kind == "advanced":
-        outlet = build_advanced_boundaries(vmap, sim_s, gwf, top, idomain)
+        outlet, note = build_advanced_boundaries(
+            vmap, sim_s, gwf, surface, members, lake, to_layer2, top, botm[0], kv
+        )
     else:
-        outlet = build_base_boundaries(vmap, sim_s, gwf)
+        outlet, note = build_base_boundaries(vmap, sim_s, gwf, lake, top, botm[0], kv)
 
     flopy.mf6.ModflowGwfwel(
         gwf,
@@ -360,7 +398,7 @@ def build(kind, grid_ws, dest):
             "filename": "sv.ghb.obs",
         },
     )
-    # the model's head observations, not those of a boundary package
+    # the head observations, not the observations of a boundary package
     obs_s = [
         p
         for p in s.packagelist
@@ -378,14 +416,38 @@ def build(kind, grid_ws, dest):
     if dest.exists():
         shutil.rmtree(dest)
     sim.write_simulation(silent=True)
-    # timing, solver, and output control are the structured model's
+    # the time steps, solver settings, and output settings are the structured
+    # model's
     for name in ("sv.tdis", "sv.ims", "sv.oc"):
         shutil.copy(src / name, dest / name)
-    print(f"{dest.name}: {vmap.ncpl} cells per layer, {len(ghb)} GHB cells")
+    note += "; " + start_from_steady_state(dest)
+    print(
+        f"{dest.name}: {vmap.ncpl} cells per layer, {len(ghb)} GHB cells, "
+        f"{lake.sum()} lake cells; {note}"
+    )
 
 
-def build_advanced_boundaries(vmap, sim_s, gwf, top, idomain):
-    """SFR, LAK, UZF, MVR, and MAW; returns the stream outlet cell."""
+def seepage_drains(vmap, gwf, top, bottom, kv, lake, stream, mover):
+    """Seepage drains on the land cells away from the lake and the stream.
+
+    Returns the cells with a drain.
+    """
+    land = ~lake
+    land[list(stream)] = False
+    cells = [int(icpl) for icpl in np.nonzero(land)[0]]
+    area = vmap.grid.area[cells]
+    rows = drain_rows(
+        [(0, icpl) for icpl in cells], top[cells], bottom[cells], kv[cells], area
+    )
+    drain_package(gwf, rows, mover)
+    return cells
+
+
+def build_advanced_boundaries(
+    vmap, sim_s, gwf, surface, members, lake, to_layer2, top, bottom, kv
+):
+    """Stream, lake, unsaturated zone, drain, Water Mover, and multi-aquifer well
+    input; returns the cell where the stream leaves the model and a summary."""
     s = sim_s.get_model()
     sfr_s = s.sfr.packagedata.array
     reaches = stream_reaches(vmap, gwf, sfr_s["cellid"][0], len(sfr_s))
@@ -416,8 +478,8 @@ def build_advanced_boundaries(vmap, sim_s, gwf, top, idomain):
         + [[n, n - 1, -(n + 1)] for n in range(1, nreach - 1)]
         + [[nreach - 1, nreach - 2]]
     )
-    # the downstream-flow observation goes at the bottom of the same structured
-    # reach (the observation file is 1-based)
+    # the stream flow observation goes at the downstream end of the same
+    # structured reach (reaches in the observation file are numbered from 1)
     sfr_obs = s.sfr.obs.continuous.get_data()["sv.sfr.obs.csv"]
     iobs = int(sfr_obs["id"][1]) - 1
     y_obs = vmap.ylen - (sfr_s["cellid"][iobs][1] + 1) * vmap.delc
@@ -441,66 +503,38 @@ def build_advanced_boundaries(vmap, sim_s, gwf, top, idomain):
         },
     )
 
-    # the lake fills the inactive layer 1 cells, connected horizontally to the
-    # active cells beside them and vertically to layer 2
-    lak_cd_s = s.lak.connectiondata.array
-    bedleak = lak_cd_s["bedleak"][0]
-    belev = float(lak_cd_s["belev"][lak_cd_s["claktype"] == "horizontal"][0])
-    lake_cells = np.where(idomain[0] <= 0)[0]
-    lake_set = set(lake_cells.tolist())
-    connections = []
-    for icpl in lake_cells:
-        iv = vmap.cverts[icpl]
-        for n in range(len(iv)):
-            key = tuple(sorted((iv[n - 1], iv[n])))
-            for nb in vmap.edges[key]:
-                if nb in lake_set or idomain[0, nb] <= 0:
-                    continue
-                width, dist = vmap.edge_geometry(key, nb)
-                connections.append(
-                    ((0, nb), "horizontal", bedleak, belev, top[nb], dist, width)
-                )
-        connections.append(((1, icpl), "vertical", bedleak, 0.0, 0.0, 0.0, 0.0))
-    lak_s = s.lak.packagedata.array[0]
-    flopy.mf6.ModflowGwflak(
+    # the lake sits on the aquifer and leaks through its bed to the cells under
+    # it
+    lak_s = s.lak
+    bedleak = float(lak_s.connectiondata.array["bedleak"][0])
+    pdata = lak_s.packagedata.array[0]
+    connections = [
+        ((1 if to_layer2[icpl] else 0, int(icpl)), bedleak)
+        for icpl in np.nonzero(lake)[0]
+    ]
+    lake_package(
         gwf,
-        pname="lak-1",
-        boundnames=True,
-        print_input=True,
-        print_stage=True,
-        stage_filerecord="sv.lak.hds",
-        mover=True,
-        nlakes=1,
-        packagedata=[(0, lak_s["strt"], len(connections), lak_s["boundname"])],
-        connectiondata=[(0, n, *c) for n, c in enumerate(connections)],
-        perioddata=dict(s.lak.perioddata.get_data().items()),
-        observations={
-            "sv.lake.obs.csv": [
-                ("lake-stage", "stage", lak_s["boundname"]),
-                ("lake-swgw", "lak", lak_s["boundname"]),
-            ],
-            "filename": "sv.lak.obs",
-        },
+        connections,
+        float(pdata["strt"]),
+        pdata["boundname"],
+        dict(lak_s.perioddata.get_data().items()),
+        surface.stage_table(),
     )
 
-    # UZF on every active layer 1 cell, with the parameters and mover receiver
-    # of the structured cell under it
+    # an unsaturated zone (UZF) cell on every land cell, with the properties of
+    # the nearest structured UZF cell
     uz_s = s.uzf.packagedata.array
-    uz_id = {(int(c[1]), int(c[2])): n for n, c in enumerate(uz_s["cellid"])}
-    receiver = {
-        int(r["id1"]): (r["pname2"], int(r["id2"]), r["mvrtype"], r["value"])
-        for r in s.mvr.perioddata.get_data(0)
-    }
-    uz_src = [
-        uz_id[(vmap.ri[icpl], vmap.ci[icpl])]
-        for icpl in range(vmap.ncpl)
-        if idomain[0, icpl] > 0
-    ]
-    uz_cells = [icpl for icpl in range(vmap.ncpl) if idomain[0, icpl] > 0]
+    uz_xy = np.array([vmap.dis_center(int(c[1]), int(c[2])) for c in uz_s["cellid"]])
+    uz_cells = [int(icpl) for icpl in np.nonzero(~lake)[0]]
     packagedata = []
-    for n, (icpl, m) in enumerate(zip(uz_cells, uz_src, strict=True)):
+    for n, icpl in enumerate(uz_cells):
+        m = int(
+            np.argmin(
+                (uz_xy[:, 0] - vmap.xc[icpl]) ** 2 + (uz_xy[:, 1] - vmap.yc[icpl]) ** 2
+            )
+        )
         r = uz_s[m]
-        # an ivertcon of -1 is written as 0, no UZF cell below
+        # no UZF cell below this one (-1, written to the file as 0)
         packagedata.append(
             (
                 n,
@@ -515,8 +549,8 @@ def build_advanced_boundaries(vmap, sim_s, gwf, top, idomain):
                 r["eps"],
             )
         )
-    # every cell gets the same rates, so the period data is written once and the
-    # rates that change come from a time series
+    # every cell has the same rates, so the cells are listed once and the rates
+    # that change from year to year come from a time series
     fields = ("finf", "pet", "extdp", "extwc", "ha", "hroot", "rootact")
     values = period_values(s.uzf.perioddata.get_data(), sim_s.tdis.nper.data, fields)
     series = {}
@@ -527,7 +561,7 @@ def build_advanced_boundaries(vmap, sim_s, gwf, top, idomain):
             row.append(f"uzf_{f}")
         else:
             row.append(values[f][0])
-    perioddata = {0: [(n, *row) for n in range(len(uz_src))]}
+    perioddata = {0: [(n, *row) for n in range(len(uz_cells))]}
     uzf = flopy.mf6.ModflowGwfuzf(
         gwf,
         pname="uzf-1",
@@ -540,13 +574,34 @@ def build_advanced_boundaries(vmap, sim_s, gwf, top, idomain):
         perioddata=perioddata,
     )
     stepwise_ts(uzf, "sv.uzf.ts", sim_s, series)
-    mvr = [("uzf-1", n, *receiver[m]) for n, m in enumerate(uz_src)]
+    # the runoff of each UZF cell goes where it drains over the land surface: the
+    # lake, a stream reach, or out of the model at the coast
+    reach_cells = {icpl: n for n, (_, _, icpl, _) in enumerate(reaches)}
+    outlet = surface.runoff_outlets(members, lake, reach_cells, vmap.coast())
+    mvr_s = s.mvr.perioddata.get_data(0)[0]
+    mvr = [
+        ("uzf-1", *r)
+        for r in mover_records(
+            uz_cells, outlet, mvr_s["mvrtype"], float(mvr_s["value"])
+        )
+    ]
+    to_lake = sum(r[2] == LAKE for r in mvr)
+    note = (
+        f"{to_layer2.sum()} connected to layer 2; {len(uz_cells)} UZF cells; runoff "
+        f"from {to_lake} to the lake, {len(mvr) - to_lake} to the stream, "
+        f"{len(uz_cells) - len(mvr)} to the coast"
+    )
+    # groundwater that seeps out at the land surface goes where the runoff of
+    # its cell goes
+    drains = seepage_drains(vmap, gwf, top, bottom, kv, lake, reach_cells, mover=True)
+    drn = [("drn-1", *r) for r in mover_records(drains, outlet, "FACTOR", 1.0)]
+    note += f"; {len(drains)} drains, {len(drn)} moved to the lake or the stream"
     flopy.mf6.ModflowGwfmvr(
         gwf,
-        maxmvr=len(mvr),
-        maxpackages=3,
-        packages=[["uzf-1"], ["lak-1"], ["sfr-1"]],
-        perioddata={0: mvr},
+        maxmvr=len(mvr) + len(drn),
+        maxpackages=4,
+        packages=[["uzf-1"], ["lak-1"], ["sfr-1"], ["drn-1"]],
+        perioddata={0: mvr + drn},
     )
 
     maw_cd = []
@@ -572,28 +627,25 @@ def build_advanced_boundaries(vmap, sim_s, gwf, top, idomain):
         connectiondata=maw_cd,
         perioddata=dict(s.maw.perioddata.get_data().items()),
     )
-    return reaches[-1][2]
+    return reaches[-1][2], note
 
 
-def build_base_boundaries(vmap, sim_s, gwf):
-    """RCH, EVT, RIV, and the pumping WEL; returns the stream outlet cell."""
+def build_base_boundaries(vmap, sim_s, gwf, lake, top, bottom, kv):
+    """Recharge, evapotranspiration, river, drain, and pumping well input; returns
+    the cell where the stream leaves the model and a summary."""
     s = sim_s.get_model()
     nper = sim_s.tdis.nper.data
 
-    # recharge is uniform over the land and over the lake, so each cell takes
-    # the time series of its zone
+    # recharge is the same everywhere on the land and everywhere on the lake, so
+    # each cell takes the time series of the land or the lake
     rch_data = s.get_package("rch").stress_period_data.get_data()
-    zone = {
-        (int(c[1]), int(c[2])): b
-        for c, b in zip(rch_data[0]["cellid"], rch_data[0]["boundname"], strict=True)
-    }
     series = {}
-    for b in sorted(set(zone.values())):
+    for b in ("lake", "land"):
         by_zone = {kper: d[d["boundname"] == b] for kper, d in rch_data.items()}
         series[f"rch_{b}"] = period_values(by_zone, nper, ("recharge",))["recharge"]
     rch_spd = []
     for icpl in range(vmap.ncpl):
-        b = zone[(vmap.ri[icpl], vmap.ci[icpl])]
+        b = "lake" if lake[icpl] else "land"
         rch_spd.append(((0, icpl), f"rch_{b}", b))
     rch = flopy.mf6.ModflowGwfrch(
         gwf,
@@ -604,14 +656,12 @@ def build_base_boundaries(vmap, sim_s, gwf):
     )
     stepwise_ts(rch, "sv.rch.ts", sim_s, series)
 
-    # lake evaporation, on the cells over the structured lake cells
+    # lake evaporation, on the lake cells
     evt_data = s.get_package("evt").stress_period_data.get_data()
     values = period_values(evt_data, nper, ("surface", "rate", "depth"))
-    evt_cells = {(int(c[1]), int(c[2])) for c in evt_data[0]["cellid"]}
     evt_spd = [
-        ((0, icpl), values["surface"][0], "evt_rate", values["depth"][0])
-        for icpl in range(vmap.ncpl)
-        if (vmap.ri[icpl], vmap.ci[icpl]) in evt_cells
+        ((0, int(icpl)), values["surface"][0], "evt_rate", values["depth"][0])
+        for icpl in np.nonzero(lake)[0]
     ]
     evt = flopy.mf6.ModflowGwfevt(
         gwf,
@@ -621,7 +671,8 @@ def build_base_boundaries(vmap, sim_s, gwf):
     )
     stepwise_ts(evt, "sv.evt.ts", sim_s, {"evt_rate": values["rate"]})
 
-    # stage, bottom, and conductance per unit length of the structured reaches
+    # river stage, river bottom, and conductance per meter of river from the
+    # structured river cells
     riv_s = s.riv.stress_period_data.get_data(0)
     reaches = stream_reaches(vmap, gwf, riv_s["cellid"][0], len(riv_s))
     stage_fit = linear_in_y(vmap, riv_s["cellid"], riv_s["stage"])
@@ -658,7 +709,9 @@ def build_base_boundaries(vmap, sim_s, gwf):
         boundnames=True,
         stress_period_data=wel_spd(vmap, s.get_package("pwell")),
     )
-    return reaches[-1][2]
+    stream = [icpl for _, _, icpl, _ in reaches]
+    drains = seepage_drains(vmap, gwf, top, bottom, kv, lake, stream, mover=False)
+    return reaches[-1][2], f"{len(evt_spd)} EVT cells; {len(drains)} drains"
 
 
 def main(argv=None):

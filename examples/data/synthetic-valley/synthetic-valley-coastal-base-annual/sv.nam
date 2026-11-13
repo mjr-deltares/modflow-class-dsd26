@@ -16,5 +16,6 @@ BEGIN packages
   oc6  sv.oc  oc
   obs6  sv.gwf.obs  gwf-obs
   ghb6  sv.ghb  ghb-1
+  drn6  sv.drn  drn-1
 END packages
 

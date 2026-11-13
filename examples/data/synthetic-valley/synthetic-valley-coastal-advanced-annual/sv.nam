@@ -17,5 +17,6 @@ BEGIN packages
   obs6  sv.obs  obs_2
   mvr6  sv.mvr  mvr
   ghb6  sv.ghb  ghb-1
+  drn6  sv.drn  drn-1
 END packages
 

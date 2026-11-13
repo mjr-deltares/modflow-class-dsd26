@@ -35,7 +35,6 @@ def main(argv=None):
     )
     gwf = sim.get_model()
     disv = gwf.disv
-    cell2d = disv.cell2d.array
     nlay, ncpl = disv.nlay.data, disv.ncpl.data
 
     hds = flopy.utils.HeadFile(args.model / "sv.hds")
@@ -48,8 +47,8 @@ def main(argv=None):
     ds = xr.Dataset(
         {
             "heads": (("time", "layer", "cell"), head.astype(np.float32)),
-            "x": ("cell", np.array([r[1] for r in cell2d])),
-            "y": ("cell", np.array([r[2] for r in cell2d])),
+            "x": ("cell", gwf.modelgrid.xcellcenters),
+            "y": ("cell", gwf.modelgrid.ycellcenters),
             "top": ("cell", disv.top.array),
             "bottom": (("layer", "cell"), disv.botm.array),
             "idomain": (("layer", "cell"), disv.idomain.array),

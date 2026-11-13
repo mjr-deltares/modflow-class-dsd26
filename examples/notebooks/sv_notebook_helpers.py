@@ -17,12 +17,17 @@ TRUTH = DATA_ROOT / "data" / "synthetic_valley_vg_truth.nc"
 # them; MAW (sv.maw) is left for the notebook to add
 BASE_ONLY = ("sv.rch", "sv.evt", "sv.riv", "sv.riv.obs", "sv.pwell.wel", "sv.gwf.obs")
 ADVANCED_FILES = (
+    "sv.ims",
     "sv.dis",
+    "sv.ic",
+    "sv.npf",
+    "sv.drn",
     "sv.uzf",
     "sv.sfr",
     "sv.sfr.obs",
     "sv.lak",
     "sv.lak.obs",
+    "sv.lak.tab",
     "sv.mvr",
     "sv.obs",
     "sv.prediction.well",
@@ -68,10 +73,15 @@ def simulated_heads(ws, kind):
 
 
 def build_advanced_without_maw(ws):
-    """Write the base model with the advanced packages except MAW to ``ws``.
+    """Write the base model with the advanced packages, except MAW, to ``ws``.
 
-    RCH, EVT, RIV, and the pumping WEL are replaced by UZF, SFR, LAK, and MVR
-    from the advanced model, and the lake cells in layer 1 are made inactive.
+    The recharge, evapotranspiration, river, and pumping well packages are
+    replaced by the advanced model's unsaturated zone (UZF), stream (SFR), lake
+    (LAK), and Water Mover (MVR) packages. The solver settings, the grid and land
+    surface, the starting heads, the hydraulic conductivity, and the seepage
+    drains also come from the advanced model, because under the lake its layer 1
+    cells are aquifer rather than the base model's very high hydraulic
+    conductivity cells.
     """
     ws = pl.Path(ws)
     if ws.exists():
@@ -131,10 +141,11 @@ def record_sfr_discharge(path, rate, discharge):
 
 
 def restore_lake_k(k_file="sv.npf_k_layer1.txt", lake_file="lake_k.txt"):
-    """Put the lake's K back into layer 1 after the K parameters are applied.
+    """Put the lake's hydraulic conductivity back into layer 1 after the K
+    parameters are applied.
 
-    `lake_file` holds the lake's K in the lake cells and 0 elsewhere. PstFrom copies
-    this function into forward_run.py, so it does its own import.
+    `lake_file` holds the lake's K in the lake cells and 0 elsewhere. PstFrom
+    copies this function into forward_run.py, so it does its own import.
     """
     import numpy as np
 
@@ -147,11 +158,12 @@ def restore_lake_k(k_file="sv.npf_k_layer1.txt", lake_file="lake_k.txt"):
 def make_homogeneous(gwf, lake_k=1000.0):
     """Give each layer one value of every property, and recharge one rate per period.
 
-    K, K33, SS, and SY become the geometric mean of the layer's active cells, and
-    the recharge of each period, if the model has RCH, the mean rate of the cells
-    that receive it. The
-    lake cells in layer 1, whose K is above ``lake_k``, keep their values. This
-    changes the model in memory; write it afterward.
+    The hydraulic conductivity, vertical anisotropy, specific storage, and
+    specific yield of each layer become the geometric mean of its active cells,
+    and the recharge of each period, if the model has a recharge package, the
+    mean rate of the cells that receive it. The lake cells in layer 1, whose
+    hydraulic conductivity is above ``lake_k``, keep their values. This changes
+    the model in memory; write it afterward.
     """
     import numpy as np
 
