@@ -1,6 +1,8 @@
 name: 2 · Run class model (Windows, macOS, Linux)
 # Installs the class environment the way a student does and runs the coastal
 # synthetic-valley base model with its mf6, on each platform the class uses.
+# Then runs the MODFLOW 6 API notebooks a to d, which load the mf6 shared
+# library (its name and folder differ by platform); e and f take too long.
 concurrency:
   group: model-run-${{ github.ref }}
   cancel-in-progress: true
@@ -11,6 +13,9 @@ on:
       - 'pixi.lock'
       - 'scripts/**'
       - 'examples/data/synthetic-valley/synthetic-valley-coastal-base-annual/**'
+      - 'examples/notebooks/mf6-api-[a-d]-*.ipynb'
+      - 'examples/notebooks/mf6_api_helpers.py'
+      - 'examples/notebooks/sv_notebook_helpers.py'
       - '.github/workflows/model-run.yml'
   push:
     branches:
@@ -20,6 +25,9 @@ on:
       - 'pixi.lock'
       - 'scripts/**'
       - 'examples/data/synthetic-valley/synthetic-valley-coastal-base-annual/**'
+      - 'examples/notebooks/mf6-api-[a-d]-*.ipynb'
+      - 'examples/notebooks/mf6_api_helpers.py'
+      - 'examples/notebooks/sv_notebook_helpers.py'
       - '.github/workflows/model-run.yml'
   # each new class MODFLOW 6 release
   workflow_run:
@@ -32,7 +40,7 @@ env:
   MODEL: examples/data/synthetic-valley/synthetic-valley-coastal-base-annual
 jobs:
   run:
-    name: Run model (${{ matrix.os }})
+    name: Run model and API notebooks (${{ matrix.os }})
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ${{ matrix.os }}
     strategy:
@@ -64,3 +72,15 @@ jobs:
         run: |
           pixi run --manifest-path "${GITHUB_WORKSPACE}/pixi.toml" mf6
           grep -q "Normal termination" mfsim.lst
+
+      - name: Run the MODFLOW 6 API notebooks (a to d)
+        working-directory: examples/notebooks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          for notebook in mf6-api-a-basic mf6-api-b-convergence \
+            mf6-api-c-recharge-callback mf6-api-d-reverse-drain; do
+            pixi run --manifest-path "${GITHUB_WORKSPACE}/pixi.toml" jupyter-nbconvert \
+              --to notebook --execute --output-dir "${RUNNER_TEMP}/api-notebooks" \
+              "${notebook}.ipynb"
+          done
