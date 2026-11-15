@@ -19,8 +19,8 @@ def find_mf6_libraries():
 
     The API runs MODFLOW 6 through its shared library (libmf6.so on Linux,
     libmf6.dylib on macOS, libmf6.dll on Windows) rather than the mf6 program.
-    Both are installed in the bin folder of the pixi environment (Library/bin on
-    Windows).
+    `pixi run setup` installs both in the same folder of the pixi environment,
+    bin on Linux and macOS and Scripts on Windows.
     """
     if sys.platform.startswith("win"):
         lib_file = "libmf6.dll"
@@ -28,19 +28,27 @@ def find_mf6_libraries():
         lib_file = "libmf6.dylib"
     else:
         lib_file = "libmf6.so"
-    prefix = pl.Path(sys.prefix)
-    for folder in (prefix / "bin", prefix / "Library" / "bin", prefix / "lib"):
-        if (folder / lib_file).is_file():
-            lib = folder / lib_file
-            break
-    else:
-        raise FileNotFoundError(
-            f"{lib_file} is not in the pixi environment; run `pixi run setup`"
-        )
     exe = shutil.which("mf6")
     if exe is None:
-        raise FileNotFoundError("mf6 is not in the pixi environment")
-    return lib, pl.Path(exe)
+        raise FileNotFoundError(
+            "mf6 is not in the pixi environment; run `pixi run setup`"
+        )
+    exe = pl.Path(exe)
+    # the folder of mf6 first, then the other folders of the environment
+    prefix = pl.Path(sys.prefix)
+    folders = (
+        exe.parent,
+        prefix / "bin",
+        prefix / "Scripts",
+        prefix / "Library" / "bin",
+        prefix / "lib",
+    )
+    for folder in folders:
+        if (folder / lib_file).is_file():
+            return folder / lib_file, exe
+    raise FileNotFoundError(
+        f"{lib_file} is not in the pixi environment; run `pixi run setup`"
+    )
 
 
 def plot_convergence(fig, ax, history, max_ticks=25):
