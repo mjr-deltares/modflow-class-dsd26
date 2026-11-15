@@ -106,3 +106,13 @@ most of its raster cells drain: the lake or a stream reach. All of a seepage
 drain's discharge goes to the same place as the runoff of its cell. Water whose
 path reaches the coast is not moved, since a General-Head Boundary cannot receive
 water from MVR. Steps 2 and 4 run each model to find its steady-state heads.
+
+## Prudic and others (2004) stream, lake, and transport example
+
+`ex-gwt-prudic2004t2` holds the grid, constant-head, lake, and stream data of
+the MODFLOW 6 example of the same name, from Prudic, D.E., Konikow, L.F., and
+Banta, E.R., 2004, A new streamflow-routing (SFR1) package to simulate
+stream-aquifer interaction with MODFLOW-2000: U.S. Geological Survey Open-File
+Report 2004–1042, 95 p., https://doi.org/10.3133/ofr20041042. The notebook
+`mf6-api-f-nitrate-reduction` builds its flow and transport model from these
+files with `examples/notebooks/mf6_api_f.py`. The model works in feet and days.

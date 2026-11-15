@@ -7,5 +7,6 @@ skip = .git,.pixi,pixi.lock,*.lock,*.svg,*.png,*.jpg,*.pdf,examples/data,.github
 # which otherwise produce false positives. No real word/identifier is this long.
 ignore-regex = [A-Za-z0-9+/=]{50,}
 # Comma-separated, lowercase list of words to treat as correct - MODFLOW domain
-# terms / package acronyms that codespell mistakes for typos (e.g. wel -> well).
-ignore-words-list = nam,wel,delt,theis
+# terms / package acronyms that codespell mistakes for typos (e.g. wel -> well),
+# and gage, the USGS spelling of gauge.
+ignore-words-list = nam,wel,delt,theis,gage
