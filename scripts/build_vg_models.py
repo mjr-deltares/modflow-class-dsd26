@@ -31,6 +31,7 @@ from sv_surface import (
     LAKE_FLOOR,
     LAKE_K,
     LAKE_K33,
+    LAKE_SY,
     Surface,
     drain_package,
     drain_rows,
@@ -38,6 +39,7 @@ from sv_surface import (
     mover_records,
     start_from_steady_state,
 )
+from update_structured_models import aquifer_storage
 
 DATA_ROOT = pl.Path(__file__).resolve().parents[1] / "examples/data/synthetic-valley"
 TRUTH = DATA_ROOT / "data/synthetic_valley_truth.nc"
@@ -227,10 +229,11 @@ def period_values(data, nper, fields):
             d = data[kper]
             current = {}
             for f in fields:
-                u = np.unique(d[f])
+                # FloPy may read a value that could name a time series as text
+                u = np.unique(d[f].astype(float))
                 if u.size != 1:
                     raise ValueError(f"{f} varies between cells in period {kper + 1}")
-                current[f] = u[0].item()
+                current[f] = float(u[0])
         for f in fields:
             values[f].append(current[f])
     return values
@@ -268,8 +271,16 @@ def wel_spd(vmap, wel):
     return spd
 
 
-def build(kind, grid_ws, dest):
-    src = DATA_ROOT / f"synthetic-valley-coastal-{kind}-annual"
+def model_name(kind, variant, grid="vg"):
+    """The folder name of a model: synthetic-valley[-coastal][-vg]-<kind>-annual."""
+    parts = ["synthetic-valley"] + ([variant] if variant == "coastal" else [])
+    parts += [grid] if grid else []
+    return "-".join(parts + [kind, "annual"])
+
+
+def build(kind, grid_ws, dest, variant):
+    src = DATA_ROOT / model_name(kind, variant, grid=None)
+    coastal = variant == "coastal"
     sim_s = flopy.mf6.MFSimulation.load(sim_ws=src, verbosity_level=0)
     s = sim_s.get_model()
     dis = s.dis
@@ -304,6 +315,11 @@ def build(kind, grid_ws, dest):
     k33[0] = float(np.median(s.npf.k33.array[0][k_s < 0.1 * LAKE_K]))
     icelltype = np.zeros((nlay, vmap.ncpl), dtype=int)
     icelltype[0] = 1
+    shape_s = s.sto.sy.array.shape
+    iconvert, ss, sy = (
+        vmap.layers(a.reshape(shape_s))
+        for a in aquifer_storage(s.sto, vmap.nrow, vmap.ncol)
+    )
     if kind == "base":
         # the top of the lake cells is the lake surface at its highest level
         top[lake] = LAKE_EXTENT
@@ -312,6 +328,8 @@ def build(kind, grid_ws, dest):
         # hydraulic conductivity, letting their saturated thickness follow the
         # head makes the steady-state solution fail to converge
         icelltype[0, lake] = 0
+        # the lake cells store water as open water does, with no compressibility
+        sy[0, lake], ss[0, lake] = LAKE_SY, 0.0
         to_layer2 = np.zeros(vmap.ncpl, dtype=bool)
     else:
         # the lake sits on the aquifer; where its bed is at the bottom of layer
@@ -364,9 +382,9 @@ def build(kind, grid_ws, dest):
     )
     flopy.mf6.ModflowGwfsto(
         gwf,
-        iconvert=layered(vmap.layers(s.sto.iconvert.array)),
-        ss=layered(vmap.layers(s.sto.ss.array)),
-        sy=layered(vmap.layers(s.sto.sy.array)),
+        iconvert=layered(iconvert),
+        ss=layered(ss),
+        sy=layered(sy),
         steady_state={0: True},
         transient={1: True},
     )
@@ -374,7 +392,17 @@ def build(kind, grid_ws, dest):
     kv = k11[0] * k33[0]
     if kind == "advanced":
         outlet, note = build_advanced_boundaries(
-            vmap, sim_s, gwf, surface, members, lake, to_layer2, top, botm[0], kv
+            vmap,
+            sim_s,
+            gwf,
+            surface,
+            members,
+            lake,
+            to_layer2,
+            top,
+            botm[0],
+            kv,
+            coastal,
         )
     else:
         outlet, note = build_base_boundaries(vmap, sim_s, gwf, lake, top, botm[0], kv)
@@ -385,19 +413,20 @@ def build(kind, grid_ws, dest):
         filename="sv.prediction.well",
         stress_period_data=wel_spd(vmap, s.get_package("prediction")),
     )
-    ghb = coastal_ghb(vmap, top, botm, idomain, k11, outlet)
-    flopy.mf6.ModflowGwfghb(
-        gwf,
-        pname="ghb-1",
-        auxiliary=["ELEVATION", "CONCENTRATION"],
-        boundnames=True,
-        print_flows=True,
-        stress_period_data={0: ghb},
-        observations={
-            "sv.ghb.obs.csv": [("coast-swgw", "ghb", "coast")],
-            "filename": "sv.ghb.obs",
-        },
-    )
+    ghb = coastal_ghb(vmap, top, botm, idomain, k11, outlet) if coastal else []
+    if coastal:
+        flopy.mf6.ModflowGwfghb(
+            gwf,
+            pname="ghb-1",
+            auxiliary=["ELEVATION", "CONCENTRATION"],
+            boundnames=True,
+            print_flows=True,
+            stress_period_data={0: ghb},
+            observations={
+                "sv.ghb.obs.csv": [("coast-swgw", "ghb", "coast")],
+                "filename": "sv.ghb.obs",
+            },
+        )
     # the head observations, not the observations of a boundary package
     obs_s = [
         p
@@ -444,7 +473,7 @@ def seepage_drains(vmap, gwf, top, bottom, kv, lake, stream, mover):
 
 
 def build_advanced_boundaries(
-    vmap, sim_s, gwf, surface, members, lake, to_layer2, top, bottom, kv
+    vmap, sim_s, gwf, surface, members, lake, to_layer2, top, bottom, kv, coastal
 ):
     """Stream, lake, unsaturated zone, drain, Water Mover, and multi-aquifer well
     input; returns the cell where the stream leaves the model and a summary."""
@@ -452,6 +481,8 @@ def build_advanced_boundaries(
     sfr_s = s.sfr.packagedata.array
     reaches = stream_reaches(vmap, gwf, sfr_s["cellid"][0], len(sfr_s))
     rtp_fit = linear_in_y(vmap, sfr_s["cellid"], sfr_s["rtp"])
+    # the slope of the stream, from the straight-line fit of its streambed
+    rgrd = float(rtp_fit[0])
     r0 = sfr_s[0]
     nreach = len(reaches)
     packagedata = []
@@ -462,7 +493,7 @@ def build_advanced_boundaries(
                 (0, icpl),
                 length,
                 r0["rwid"],
-                r0["rgrd"],
+                rgrd,
                 float(np.polyval(rtp_fit, 0.5 * (yt + yb))),
                 r0["rbth"],
                 r0["rhk"],
@@ -577,7 +608,8 @@ def build_advanced_boundaries(
     # the runoff of each UZF cell goes where it drains over the land surface: the
     # lake, a stream reach, or out of the model at the coast
     reach_cells = {icpl: n for n, (_, _, icpl, _) in enumerate(reaches)}
-    outlet = surface.runoff_outlets(members, lake, reach_cells, vmap.coast())
+    coast = vmap.coast() if coastal else {}
+    outlet = surface.runoff_outlets(members, lake, reach_cells, coast)
     mvr_s = s.mvr.perioddata.get_data(0)[0]
     mvr = [
         ("uzf-1", *r)
@@ -731,7 +763,8 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
     for kind in args.kind:
-        build(kind, args.grid, args.dest / f"synthetic-valley-coastal-vg-{kind}-annual")
+        dest = args.dest / model_name(kind, "coastal")
+        build(kind, args.grid, dest, "coastal")
     return 0
 
 

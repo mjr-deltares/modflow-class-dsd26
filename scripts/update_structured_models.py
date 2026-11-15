@@ -35,6 +35,7 @@ import flopy
 import numpy as np
 from scipy.ndimage import distance_transform_edt
 from sv_surface import (
+    AQUIFER_SY,
     BASE_RECHARGE_SCALE,
     COAST,
     DATA_ROOT,
@@ -43,6 +44,7 @@ from sv_surface import (
     LAKE_FLOOR,
     LAKE_K,
     LAKE_K33,
+    LAKE_SY,
     Surface,
     drain_package,
     drain_rows,
@@ -52,7 +54,20 @@ from sv_surface import (
 )
 
 KINDS = ("base", "advanced")
-CHANGED = ("dis", "npf", "ic", "rch", "evt", "lak", "laktab", "uzf", "mvr", "drn")
+CHANGED = (
+    "dis",
+    "npf",
+    "ic",
+    "rch",
+    "evt",
+    "lak",
+    "laktab",
+    "uzf",
+    "mvr",
+    "drn",
+    "sfr",
+    "sto",
+)
 # m, the head-change criterion of the advanced models' linear solver; it is
 # tight enough that the runoff and seepage the Water Mover sends to a short
 # stream reach stop changing from one solver iteration to the next, which lets
@@ -61,6 +76,25 @@ ADVANCED_INNER_DVCLOSE = 3.048e-9
 # the line that adds the drains to the model name file, which is otherwise left
 # as it is
 DRN_ENTRY = "  drn6  sv.drn  drn-1"
+
+
+def aquifer_storage(sto, nrow, ncol):
+    """Storage of the aquifer: convertibility, specific storage, and specific yield.
+
+    Layer 1 is convertible, with a specific yield of AQUIFER_SY. Its specific
+    storage in the base model's lake cells, which have none, is replaced by
+    that of the nearest aquifer cell.
+    """
+    iconvert = dis_layers(sto.iconvert.array)
+    ss = dis_layers(sto.ss.array)
+    sy = dis_layers(sto.sy.array)
+    lake = (ss[0] <= 0.0).reshape(nrow, ncol)
+    if lake.any():
+        _, (ii, jj) = distance_transform_edt(lake, return_indices=True)
+        ss[0] = ss[0].reshape(nrow, ncol)[ii, jj].ravel()
+    iconvert[0] = 1
+    sy[0] = AQUIFER_SY
+    return iconvert, ss, sy
 
 
 def aquifer_k(k, nrow, ncol):
@@ -82,14 +116,18 @@ def uniform_rows(data, fields):
     for kper, d in data.items():
         values[kper] = {}
         for f in fields:
-            u = np.unique(d[f])
+            # FloPy may read a value that could name a time series as text
+            u = np.unique(d[f].astype(float))
             if u.size != 1:
                 raise ValueError(f"{f} varies between cells in period {kper + 1}")
-            values[kper][f] = u[0].item()
+            values[kper][f] = float(u[0])
     return values
 
 
-def update(kind, ws, surface):
+def update(kind, ws, surface, advanced_ws):
+    """Change one model in place; ``advanced_ws`` is the advanced model whose
+    infiltration and evapotranspiration set a base model's recharge.
+    """
     sim = flopy.mf6.MFSimulation.load(sim_ws=ws, verbosity_level=0, write_headers=False)
     sim.simulation_data.float_precision = 12
     sim.simulation_data.float_characters = 20
@@ -106,6 +144,7 @@ def update(kind, ws, surface):
     idomain = dis_layers(dis.idomain.array)
     icelltype = np.zeros((nlay, nrow * ncol), dtype=int)
     icelltype[0] = 1
+    iconvert, ss, sy = aquifer_storage(gwf.sto, nrow, ncol)
 
     if kind == "base":
         top[lake] = LAKE_EXTENT
@@ -114,7 +153,9 @@ def update(kind, ws, surface):
         # hydraulic conductivity, letting their saturated thickness follow the
         # head makes the steady-state solution fail to converge
         icelltype[0, lake] = 0
-        note = base_boundaries(gwf, lake, ncol)
+        # the lake cells store water as open water does, with no compressibility
+        sy[0, lake], ss[0, lake] = LAKE_SY, 0.0
+        note = base_boundaries(gwf, lake, ncol, advanced_ws)
         stream = [
             i * ncol + j for _, i, j in gwf.riv.stress_period_data.get_data(0)["cellid"]
         ]
@@ -169,6 +210,9 @@ def update(kind, ws, surface):
     gwf.npf.k = k.reshape(shape)
     gwf.npf.k33 = k33.reshape(shape)
     gwf.npf.icelltype = icelltype.reshape(shape)
+    gwf.sto.iconvert = iconvert.reshape(shape)
+    gwf.sto.ss = ss.reshape(shape)
+    gwf.sto.sy = sy.reshape(shape)
     # write only the input files that change, so the others are left as they are
     for package in gwf.packagelist:
         if package.package_type in CHANGED:
@@ -186,13 +230,13 @@ def dis_layers(arr):
     return arr.reshape(arr.shape[0], -1).copy()
 
 
-def base_boundaries(gwf, lake, ncol):
+def base_boundaries(gwf, lake, ncol, advanced_ws):
     """Recharge on the lake and land cells and evaporation on the lake cells."""
     # the lake recharge is the rainfall; the land recharge is the advanced
     # model's infiltration minus its potential evapotranspiration, scaled
     uzf = (
         flopy.mf6.MFSimulation.load(
-            sim_ws=DATA_ROOT / "synthetic-valley-coastal-advanced-annual",
+            sim_ws=advanced_ws,
             verbosity_level=0,
             load_only=["uzf"],
         )
@@ -234,7 +278,16 @@ def base_boundaries(gwf, lake, ncol):
 
 
 def advanced_boundaries(gwf, surface, members, lake, to_layer2, ncol):
-    """Lake, unsaturated zone, and Water Mover input for the lake on the aquifer."""
+    """Stream gradient, and lake, unsaturated zone, and Water Mover input for the
+    lake on the aquifer."""
+    # the slope of each stream reach: the fall of the streambed to the next reach
+    # over the reach length (the last reach takes the fall above it)
+    sfr = gwf.sfr.packagedata.array.copy()
+    fall = -np.diff(sfr["rtp"].astype(float))
+    fall = np.append(fall, fall[-1])
+    sfr["rgrd"] = fall / sfr["rlen"].astype(float)
+    gwf.sfr.packagedata = sfr
+
     lak_s = gwf.lak
     bedleak = float(lak_s.connectiondata.array["bedleak"][0])
     pdata = lak_s.packagedata.array[0]
@@ -299,11 +352,10 @@ def advanced_boundaries(gwf, surface, members, lake, to_layer2, ncol):
     for r in gwf.sfr.packagedata.array:
         _, i, j = r["cellid"]
         reaches[i * ncol + j] = int(r["ifno"])
-    coast = [
-        i * ncol + j
-        for k, i, j in gwf.ghb.stress_period_data.get_data(0)["cellid"]
-        if k == 0
-    ]
+    # the layer 1 cells of the coastal boundary, in the coastal models
+    ghb = gwf.get_package("ghb")
+    cellids = [] if ghb is None else ghb.stress_period_data.get_data(0)["cellid"]
+    coast = [i * ncol + j for k, i, j in cellids if k == 0]
     outlet = surface.runoff_outlets(members, lake, reaches, coast)
     first = gwf.mvr.perioddata.get_data(0)[0]
     records = mover_records(land, outlet, first["mvrtype"], float(first["value"]))
@@ -328,6 +380,7 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
     surface = Surface()
+    advanced_ws = DATA_ROOT / "synthetic-valley-coastal-advanced-annual"
     for kind in args.kind:
         ws = DATA_ROOT / f"synthetic-valley-coastal-{kind}-annual"
         if args.dest is not None:
@@ -336,7 +389,7 @@ def main(argv=None):
                 shutil.rmtree(dest)
             shutil.copytree(ws, dest)
             ws = dest
-        update(kind, ws, surface)
+        update(kind, ws, surface, advanced_ws)
     return 0
 
 

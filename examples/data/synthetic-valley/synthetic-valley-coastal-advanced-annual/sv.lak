@@ -13,7 +13,7 @@ BEGIN dimensions
 END dimensions
 
 BEGIN packagedata
-  1        5.970309893332  153  lake_harbaugh
+  1        6.064638047571  153  lake_harbaugh
 END packagedata
 
 BEGIN connectiondata
@@ -177,107 +177,107 @@ BEGIN tables
 END tables
 
 BEGIN period  1
-  1  rainfall        0.002839502209
-  1  evaporation        0.002133260717
+  1  rainfall  0.002839502208947794
+  1  evaporation  0.002133260717239428
 END period  1
 
 BEGIN period  2
-  1  rainfall        0.003199008219
-  1  evaporation        0.002607241058
+  1  rainfall  0.0031990082191780825
+  1  evaporation  0.0026072410583464238
 END period  2
 
 BEGIN period  3
-  1  rainfall        0.001880295890
-  1  evaporation  9.007470917177E-04
+  1  rainfall  0.0018802958904109589
+  1  evaporation  0.0009007470917177402
 END period  3
 
 BEGIN period  4
-  1  rainfall        0.003052163934
-  1  evaporation        0.002379571432
+  1  rainfall  0.003052163934426229
+  1  evaporation  0.0023795714324736654
 END period  4
 
 BEGIN period  5
-  1  rainfall        0.003383419178
-  1  evaporation        0.002916500722
+  1  rainfall  0.0033834191780821917
+  1  evaporation  0.0029165007215626805
 END period  5
 
 BEGIN period  6
-  1  rainfall        0.002720931507
-  1  evaporation        0.001886191112
+  1  rainfall  0.002720931506849315
+  1  evaporation  0.0018861911116761917
 END period  6
 
 BEGIN period  7
-  1  rainfall        0.003215013699
-  1  evaporation        0.002633395750
+  1  rainfall  0.0032150136986301373
+  1  evaporation  0.002633395749900989
 END period  7
 
 BEGIN period  8
-  1  rainfall        0.002472683060
-  1  evaporation        0.001561780302
+  1  rainfall  0.002472683060109289
+  1  evaporation  0.0015617803024142582
 END period  8
 
 BEGIN period  9
-  1  rainfall        0.003155167123
-  1  evaporation        0.002536268400
+  1  rainfall  0.003155167123287671
+  1  evaporation  0.0025362684001635845
 END period  9
 
 BEGIN period  10
-  1  rainfall        0.003205967123
-  1  evaporation        0.002618596624
+  1  rainfall  0.0032059671232876705
+  1  evaporation  0.002618596624434994
 END period  10
 
 BEGIN period  11
-  1  rainfall        0.002740416438
-  1  evaporation        0.001913302341
+  1  rainfall  0.0027404164383561646
+  1  evaporation  0.0019133023406480178
 END period  11
 
 BEGIN period  12
-  1  rainfall        0.002451863388
-  1  evaporation        0.001535591047
+  1  rainfall  0.002451863387978142
+  1  evaporation  0.0015355910465934723
 END period  12
 
 BEGIN period  13
-  1  rainfall        0.002829490411
-  1  evaporation        0.002039702968
+  1  rainfall  0.002829490410958904
+  1  evaporation  0.002039702967815919
 END period  13
 
 BEGIN period  14
-  1  rainfall        0.004644372603
-  1  evaporation        0.005495466741
+  1  rainfall  0.004644372602739727
+  1  evaporation  0.005495466741127264
 END period  14
 
 BEGIN period  15
-  1  rainfall        0.002839928767
-  1  evaporation        0.002054780184
+  1  rainfall  0.002839928767123287
+  1  evaporation  0.002054780183742188
 END period  15
 
 BEGIN period  16
-  1  rainfall        0.003433163934
-  1  evaporation        0.003010732129
+  1  rainfall  0.0034331639344262295
+  1  evaporation  0.00301073212868392
 END period  16
 
 BEGIN period  17
-  1  rainfall        0.002432832877
-  1  evaporation        0.001507908631
+  1  rainfall  0.0024328328767123284
+  1  evaporation  0.001507908631286046
 END period  17
 
 BEGIN period  18
-  1  rainfall        0.002836449315
-  1  evaporation        0.002049748276
+  1  rainfall  0.0028364493150684934
+  1  evaporation  0.002049748276278886
 END period  18
 
 BEGIN period  19
-  1  rainfall        0.002420306849
-  1  evaporation        0.001492420942
+  1  rainfall  0.0024203068493150685
+  1  evaporation  0.0014924209419962756
 END period  19
 
 BEGIN period  20
-  1  rainfall        0.002385240437
-  1  evaporation        0.001453273521
+  1  rainfall  0.0023852404371584703
+  1  evaporation  0.0014532735209696265
 END period  20
 
 BEGIN period  21
-  1  rainfall        0.002095326027
-  1  evaporation        0.001118545591
+  1  rainfall  0.0020953260273972605
+  1  evaporation  0.0011185455908569973
 END period  21
 

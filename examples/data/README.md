@@ -19,7 +19,10 @@ Every model works in meters and days and has five layers:
   no thickness, which connect layer 2 directly to layer 4, and
 - layers 4 and 5 are the lower aquifer.
 
-Layer 1 is convertible, except the base models' lake cells. Its top is the
+Layer 1 is convertible: its saturated thickness follows the water table, which
+stores and releases water with a specific yield of 0.1. The base models' lake
+cells keep their full thickness and store water as open water does, with a
+specific yield of 1 and no specific storage. The top of layer 1 is the
 land surface, from the mean of a 15.24 m raster of the land surface and lake
 bed over each cell. The lake is the basin
 of that surface flooded to 6.5 m, the largest extent of the lake in the
@@ -39,7 +42,10 @@ the flow system before pumping, followed by 20 one-year transient periods. Two
 pumping wells, `reilly` and `vc`, screened in layers 4 and 5, start in the
 second stress period. The coastal GHB holds a head of 0 m and carries the
 elevation of the boundary and a seawater concentration of 35 kilograms per
-cubic meter as auxiliary variables, for density-dependent flow.
+cubic meter as auxiliary variables, for density-dependent flow. The conductance
+of each boundary cell is its horizontal hydraulic conductivity times the area
+of its face on the sea, over half the cell length, and layer 3 has boundary
+cells only where the clay is.
 
 | Model | Grid | Stresses |
 |---|---|---|
@@ -50,7 +56,7 @@ cubic meter as auxiliary variables, for density-dependent flow.
 
 The base models' land recharge is the advanced models' infiltration less
 their potential evapotranspiration, times 2.08, which leaves the structured
-base model's steady-state heads at the observation wells about 0.3 m below the
+base model's steady-state heads at the observation wells about 0.35 m below the
 truth on average.
 
 In the advanced models the lake is connected vertically to the layer 1 cell
@@ -59,6 +65,10 @@ the layer 1 cell is a vertical pass-through cell and the lake is connected to
 layer 2. The stage-volume-area table runs from the bottom of layer 1 to
 14.96 m, where the flooded basin would cross the ridge, so the lake has no
 outlet.
+
+In the advanced models the streambed falls 0.0002 m per meter of stream, the
+drop of the streambed from one reach to the next over the reach length; with
+the flow, it sets how deep the water in the stream is.
 
 The two structured models share their aquifer properties, which represent the
 valley with one horizontal hydraulic conductivity field for both aquifers. The
