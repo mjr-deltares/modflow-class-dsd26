@@ -5,13 +5,13 @@ a steady groundwater-flow (GWF) model coupled to one groundwater-transport (GWT)
 model per nitrogen species, with SFR (streams), LAK (a lake), and MVR (a mover)
 plus advanced-package transport (SFT/LKT/MVT).
 
-None of this construction is the API lesson - it is just the working model the
-reaction callback acts on - so it lives here and the notebook imports
+None of this construction is the API lesson - it is the model the reaction
+callback acts on - so it is built here and the notebook imports
 ``build_prudic_simulation`` (and a few geometry/mass helpers) instead of showing
-~150 lines of plumbing. All parameters below are taken from the base example and
-are held fixed; the notebook supplies only the reaction configuration.
+~150 lines of model construction. All parameters below are taken from the base
+example and are held fixed; the notebook supplies only the reaction configuration.
 
-The data files (grid, boundaries, stream geometry) live in ``../data/<base>``
+The data files (grid, boundaries, stream geometry) are in ``../data/<base>``
 relative to the notebook, so import and call these from that working directory.
 """
 
@@ -209,7 +209,7 @@ def build_prudic_simulation(
     nstp=300,
 ):
     """Assemble one ``MFSimulation`` holding the GWF flow model and one GWT model
-    per entry in ``species``, wired together with GWF-GWT exchanges and sharing a
+    per entry in ``species``, joined by GWF-GWT exchanges and sharing a
     single transport solution.
 
     Parameters
@@ -493,7 +493,7 @@ def _build_gwt(
             pname="SRC-1",
         )
 
-    # LKT: lake transport (the source species lives here)
+    # LKT: lake transport (the lake supplies the source species)
     lake_strt = slug_source_conc if (is_source and not sustained) else 0.0
     lktpackagedata = [
         (0, lake_strt, 99.0, 999.0, "mylake1"),
