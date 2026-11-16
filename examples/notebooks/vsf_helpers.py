@@ -153,6 +153,20 @@ def load_valley(ws):
     return sim, gwf
 
 
+# terms of the aquifer budget and the ZONEBUDGET names they come from
+BUDGET_TERMS = {
+    "RCH": "RCH",
+    "LAKE": "ZONE_2",
+    "RIV": "RIV",
+    "GHB": "GHB",
+    "STO-SY": "STO_SY",
+    "STO-UZ": "STO_UZ",
+    "STO-SS": "STO_SS",
+    "WEL": "PWELL_WEL",
+    "WEL2": "PREDICTION_WEL",
+}
+
+
 def lake_cells(gwf):
     """Cells of the lake, which the valley builds from very permeable cells."""
     return gwf.npf.k.array > 1.0e4
@@ -333,9 +347,10 @@ def aquifer_budget(ws, gwf):
     """Water budget of the aquifer outside the lake, at every time step.
 
     Runs ZONEBUDGET (zbud6) on the budget file in ``ws`` with the lake cells as a
-    zone of their own. Returns a DataFrame of flow rates (m3/d) indexed by time
-    (days); each column is the net flow into the aquifer for one term, and
-    ``LAKE`` is the flow from the lake cells.
+    zone of their own. Returns a DataFrame indexed by time (days) with the stress
+    period ``kper`` and the inflow and outflow rates (m3/d) of each term in
+    ``BUDGET_TERMS`` as ``<term>_IN`` and ``<term>_OUT``; ``LAKE`` is the flow
+    between the aquifer and the lake cells.
     """
     zones = np.where(lake_cells(gwf), 2, 1)
     zb = gwf.output.zonebudget(zones)
@@ -343,16 +358,17 @@ def aquifer_budget(ws, gwf):
     zb.write_input()
     success, _ = zb.run_model(silent=True)
     assert success, "ZONEBUDGET did not run"
-    table = zb.get_dataframes(net=True, pivot=True, start_datetime=None)
+    table = zb.get_dataframes(net=False, pivot=True, start_datetime=None)
     table = table[table["zone"] == 1].set_index("totim").sort_index()
-    columns = {
-        "RECHARGE": [c for c in table.columns if c == "RCH"],
-        "LAKE": ["ZONE_2"],
-        "STORAGE": [c for c in table.columns if c.startswith("STO")],
-        "STREAM": ["RIV"],
-        "COAST": ["GHB"],
-        "WELLS": [c for c in table.columns if c.endswith("_WEL")],
-    }
-    return table.assign(
-        **{name: table[cols].sum(axis=1) for name, cols in columns.items()}
-    )[list(columns)]
+    budget = table[["kper"]].copy()
+    for term, name in BUDGET_TERMS.items():
+        if term == "LAKE":
+            budget["LAKE_IN"], budget["LAKE_OUT"] = (
+                table["FROM_ZONE_2"],
+                table["TO_ZONE_2"],
+            )
+        else:
+            for side in ("IN", "OUT"):
+                column = f"{name}_{side}"
+                budget[f"{term}_{side}"] = table[column] if column in table else 0.0
+    return budget
