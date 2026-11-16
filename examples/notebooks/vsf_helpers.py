@@ -175,9 +175,9 @@ def refine_top_layer(sim, target_dz=0.25, refine_depth=2.0):
     discretization, the starting heads, the hydraulic conductivity and storage,
     recharge (still on the top cell), and the river, coastal general-head
     boundary, and wells. A boundary that was in layer 1 goes in the sublayer that
-    brackets its control elevation, so head-dependent boundaries keep working
-    when the top of the refined zone is dry. Returns the number of refined
-    sublayers ``n_ref``; the transition cell is layer ``n_ref``.
+    brackets its control elevation, so it exchanges water with the aquifer
+    there. Returns the number of refined sublayers ``n_ref``; the transition
+    cell is layer ``n_ref``.
     """
     gwf = sim.get_model("sv")
     dis = gwf.dis
