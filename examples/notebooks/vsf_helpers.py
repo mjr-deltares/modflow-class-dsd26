@@ -89,9 +89,11 @@ def water_table(head, phead):
     """
     nlay, nrow, ncol = head.shape
     wt = np.full((nrow, ncol), np.nan)
+    # inactive and pass-through cells are written as 1e30, which is not saturated
+    wet = (phead >= 0.0) & (phead < 1e29)
     for i in range(nrow):
         for j in range(ncol):
-            sat = np.nonzero(phead[:, i, j] >= 0.0)[0]
+            sat = np.nonzero(wet[:, i, j])[0]
             if sat.size:
                 wt[i, j] = head[sat[0], i, j]
     return np.ma.masked_invalid(wt)
