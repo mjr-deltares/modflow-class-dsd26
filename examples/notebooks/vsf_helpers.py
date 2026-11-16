@@ -10,6 +10,7 @@ the synthetic-valley model:
 - ``refine_top_layer`` splits layer 1 into thin sublayers and remaps the grid,
   the aquifer properties, and every boundary package onto the finer grid.
 - ``water_table`` turns a VSF pressure-head field into a water-table surface.
+- ``aquifer_budget`` runs ZONEBUDGET for the aquifer outside the lake.
 
 Units follow the synthetic-valley model: meters and days.
 """
@@ -326,3 +327,32 @@ def read_water_tables(ws, vsf, times=None):
     else:
         tables = [np.ma.masked_greater(heads.get_data(totim=t)[0], 1e29) for t in times]
     return np.array(times), np.ma.array(tables)
+
+
+def aquifer_budget(ws, gwf):
+    """Water budget of the aquifer outside the lake, at every time step.
+
+    Runs ZONEBUDGET (zbud6) on the budget file in ``ws`` with the lake cells as a
+    zone of their own. Returns a DataFrame of flow rates (m3/d) indexed by time
+    (days); each column is the net flow into the aquifer for one term, and
+    ``LAKE`` is the flow from the lake cells.
+    """
+    zones = np.where(lake_cells(gwf), 2, 1)
+    zb = gwf.output.zonebudget(zones)
+    zb.change_model_ws(str(ws))
+    zb.write_input()
+    success, _ = zb.run_model(silent=True)
+    assert success, "ZONEBUDGET did not run"
+    table = zb.get_dataframes(net=True, pivot=True, start_datetime=None)
+    table = table[table["zone"] == 1].set_index("totim").sort_index()
+    columns = {
+        "RECHARGE": [c for c in table.columns if c == "RCH"],
+        "LAKE": ["ZONE_2"],
+        "STORAGE": [c for c in table.columns if c.startswith("STO")],
+        "STREAM": ["RIV"],
+        "COAST": ["GHB"],
+        "WELLS": [c for c in table.columns if c.endswith("_WEL")],
+    }
+    return table.assign(
+        **{name: table[cols].sum(axis=1) for name, cols in columns.items()}
+    )[list(columns)]
