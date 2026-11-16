@@ -133,16 +133,15 @@ def _rebuild_boundaries(gwf, riv_layer=None, ghb_layer=None):
 def load_valley(ws):
     """Load the base synthetic-valley model, ready to be written to ``ws``.
 
-    Two things are left out so the notebook can concentrate on the unsaturated
-    zone: the lake evapotranspiration (EVT), and the observation packages, which
-    point at cell layers that change when the grid is refined. Recharge, the
-    river, the coastal general-head boundary, and the pumping wells stay.
+    Evapotranspiration (EVT), the land-surface seepage drains (DRN), and the
+    observation packages are left out. Recharge, the river, the coastal
+    general-head boundary, and the pumping wells stay.
     """
     sim = flopy.mf6.MFSimulation.load(
         sim_name="sv", sim_ws=str(BASE_MODEL), verbosity_level=0
     )
     gwf = sim.get_model("sv")
-    for name in ("EVT_0", "GWF-OBS", "GHB_OBS", "RIV_OBS"):
+    for name in ("EVT_0", "DRN-1", "GWF-OBS", "GHB_OBS", "RIV_OBS"):
         if name in gwf.get_package_list():
             gwf.remove_package(name)
     _rebuild_boundaries(gwf)
