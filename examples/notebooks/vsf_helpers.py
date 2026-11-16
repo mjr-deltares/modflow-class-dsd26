@@ -6,6 +6,7 @@ the synthetic-valley model:
 
 - ``SOILS`` and the van Genuchten functions give the soil-characteristic curves.
 - ``load_valley`` loads the base valley model that the notebook starts from.
+- ``lake_stage`` and ``set_lake`` hold the lake at the base model's level.
 - ``refine_top_layer`` splits layer 1 into thin sublayers and remaps the grid,
   the aquifer properties, and every boundary package onto the finer grid.
 - ``water_table`` turns a VSF pressure-head field into a water-table surface.
@@ -151,6 +152,47 @@ def load_valley(ws):
     return sim, gwf
 
 
+def lake_cells(gwf):
+    """Cells of the lake, which the valley builds from very permeable cells."""
+    return gwf.npf.k.array > 1.0e4
+
+
+def lake_stage(ws, gwf):
+    """Lake level (m) at the end of every time step of a base-valley run.
+
+    Returns ``(times, stages)``; the level is the mean head in the lake cells of
+    layer 1.
+    """
+    lake = lake_cells(gwf)[0]
+    heads = flopy.utils.HeadFile(str(pl.Path(ws) / "sv.hds"))
+    times = np.array(heads.get_times())
+    stages = np.array([heads.get_data(totim=t)[0][lake].mean() for t in times])
+    return times, stages
+
+
+def set_lake(gwf, times, stages):
+    """Hold every lake cell at the lake level with constant heads (CHD).
+
+    ``times`` and ``stages`` are the ends of the time steps and the level at each,
+    as from ``lake_stage``; the model must use the same time steps. Each level is
+    held through its time step.
+    """
+    cells = [tuple(int(v) for v in c) for c in np.argwhere(lake_cells(gwf))]
+    chd = flopy.mf6.ModflowGwfchd(
+        gwf, stress_period_data={0: [[c, "stage"] for c in cells]}, pname="CHD-LAKE"
+    )
+    # MODFLOW 6 averages a time series over each time step, so a stepwise series
+    # that starts each level at the start of its step gives that level exactly
+    starts = [0.0, *times[:-1]]
+    series = [(float(t), float(h)) for t, h in zip(starts, stages)]
+    chd.ts.initialize(
+        filename="sv.lake.ts",
+        timeseries=[*series, (float(times[-1]), float(stages[-1]))],
+        time_series_namerecord="stage",
+        interpolation_methodrecord="stepwise",
+    )
+
+
 def set_substeps(sim, nstp):
     """Split every transient stress period into ``nstp`` time steps.
 
@@ -239,12 +281,7 @@ def refine_top_layer(sim, target_dz=0.25, refine_depth=2.0):
     )
     gwf.ic.strt.set_data(stack(strt))
     gwf.npf.k.set_data(stack(k))
-    # The lake cells use a vertical conductivity ~2e6 times k to keep the lake
-    # surface flat. In thin sublayers that makes the vertical conductance so large
-    # it wrecks the nonlinear Richards solve, so cap the ratio at isotropic.
-    k33_new = stack(k33)
-    k33_new[: n_ref + 1] = np.minimum(k33_new[: n_ref + 1], 1.0)
-    gwf.npf.k33.set_data(k33_new)
+    gwf.npf.k33.set_data(stack(k33))
     gwf.sto.ss.set_data(stack(ss))
     gwf.sto.sy.set_data(stack(sy))
 
