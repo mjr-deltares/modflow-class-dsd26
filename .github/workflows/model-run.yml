@@ -3,8 +3,9 @@ name: 2 · Run class model (Windows, macOS, Linux)
 # synthetic-valley base model with its mf6, on each platform the class uses.
 # Then runs the MODFLOW 6 API notebooks a to d, which load the mf6 shared
 # library (its name and folder differ by platform); e and f take too long.
-# Then runs the SWI notebook mf6-swi-buy-a; mf6-swi-buy-b and
-# synthetic-valley-h-swi take too long.
+# Then runs the SWI notebook mf6-swi-buy-a and the VSF notebook
+# vsf-1-surface-boundary; mf6-swi-buy-b, synthetic-valley-h-swi, and
+# vsf-2-synthetic-valley take too long.
 concurrency:
   group: model-run-${{ github.ref }}
   cancel-in-progress: true
@@ -18,6 +19,7 @@ on:
       - 'examples/notebooks/mf6-api-[a-d]-*.ipynb'
       - 'examples/notebooks/mf6_api_helpers.py'
       - 'examples/notebooks/mf6-swi-buy-a.ipynb'
+      - 'examples/notebooks/vsf-1-surface-boundary.ipynb'
       - 'examples/notebooks/sv_notebook_helpers.py'
       - '.github/workflows/model-run.yml'
   push:
@@ -31,6 +33,7 @@ on:
       - 'examples/notebooks/mf6-api-[a-d]-*.ipynb'
       - 'examples/notebooks/mf6_api_helpers.py'
       - 'examples/notebooks/mf6-swi-buy-a.ipynb'
+      - 'examples/notebooks/vsf-1-surface-boundary.ipynb'
       - 'examples/notebooks/sv_notebook_helpers.py'
       - '.github/workflows/model-run.yml'
   # each new class MODFLOW 6 release
@@ -89,11 +92,13 @@ jobs:
               "${notebook}.ipynb"
           done
 
-      - name: Run the SWI notebook (mf6-swi-buy-a)
+      - name: Run the SWI and VSF notebooks (mf6-swi-buy-a, vsf-1)
         working-directory: examples/notebooks
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          pixi run --manifest-path "${GITHUB_WORKSPACE}/pixi.toml" jupyter-nbconvert \
-            --to notebook --execute --output-dir "${RUNNER_TEMP}/swi-notebooks" \
-            mf6-swi-buy-a.ipynb
+          for notebook in mf6-swi-buy-a vsf-1-surface-boundary; do
+            pixi run --manifest-path "${GITHUB_WORKSPACE}/pixi.toml" jupyter-nbconvert \
+              --to notebook --execute --output-dir "${RUNNER_TEMP}/swi-vsf-notebooks" \
+              "${notebook}.ipynb"
+          done
