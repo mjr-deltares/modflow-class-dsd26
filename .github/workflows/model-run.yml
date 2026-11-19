@@ -3,6 +3,8 @@ name: 2 · Run class model (Windows, macOS, Linux)
 # synthetic-valley base model with its mf6, on each platform the class uses.
 # Then runs the MODFLOW 6 API notebooks a to d, which load the mf6 shared
 # library (its name and folder differ by platform); e and f take too long.
+# Then runs the SWI notebooks mf6-swi-buy-a and synthetic-valley-h-swi;
+# mf6-swi-buy-b takes too long.
 concurrency:
   group: model-run-${{ github.ref }}
   cancel-in-progress: true
@@ -15,6 +17,8 @@ on:
       - 'examples/data/synthetic-valley/synthetic-valley-coastal-base-annual/**'
       - 'examples/notebooks/mf6-api-[a-d]-*.ipynb'
       - 'examples/notebooks/mf6_api_helpers.py'
+      - 'examples/notebooks/mf6-swi-buy-a.ipynb'
+      - 'examples/notebooks/synthetic-valley-h-swi.ipynb'
       - 'examples/notebooks/sv_notebook_helpers.py'
       - '.github/workflows/model-run.yml'
   push:
@@ -27,6 +31,8 @@ on:
       - 'examples/data/synthetic-valley/synthetic-valley-coastal-base-annual/**'
       - 'examples/notebooks/mf6-api-[a-d]-*.ipynb'
       - 'examples/notebooks/mf6_api_helpers.py'
+      - 'examples/notebooks/mf6-swi-buy-a.ipynb'
+      - 'examples/notebooks/synthetic-valley-h-swi.ipynb'
       - 'examples/notebooks/sv_notebook_helpers.py'
       - '.github/workflows/model-run.yml'
   # each new class MODFLOW 6 release
@@ -82,5 +88,16 @@ jobs:
             mf6-api-c-recharge-callback mf6-api-d-reverse-drain; do
             pixi run --manifest-path "${GITHUB_WORKSPACE}/pixi.toml" jupyter-nbconvert \
               --to notebook --execute --output-dir "${RUNNER_TEMP}/api-notebooks" \
+              "${notebook}.ipynb"
+          done
+
+      - name: Run the SWI notebooks
+        working-directory: examples/notebooks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          for notebook in mf6-swi-buy-a synthetic-valley-h-swi; do
+            pixi run --manifest-path "${GITHUB_WORKSPACE}/pixi.toml" jupyter-nbconvert \
+              --to notebook --execute --output-dir "${RUNNER_TEMP}/swi-notebooks" \
               "${notebook}.ipynb"
           done
