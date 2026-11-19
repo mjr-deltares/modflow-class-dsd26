@@ -115,6 +115,94 @@ def build_advanced_without_maw(ws):
     return flopy.mf6.MFSimulation.load(sim_ws=ws, verbosity_level=0)
 
 
+def build_variable_density(sim, ws, buoyancy=True):
+    """Write ``sim`` and a seawater transport model to ``ws``; return the new simulation.
+
+    ``sim`` is a simulation of the coastal valley whose GHB lists the
+    concentration and elevation of the sea as auxiliary variables; it is not
+    changed. The transport model ("salt") simulates the salt the coastal GHB
+    brings into the aquifer, and the Buoyancy (BUY) package gives the flow model
+    the density of the salty water. With ``buoyancy=False``, BUY is left out and
+    the coastal GHB heads are raised to equivalent freshwater heads instead.
+    """
+    ws = pl.Path(ws)
+    sim_ws = pl.Path(sim.sim_path)
+    if ws.resolve() == sim_ws.resolve():
+        raise ValueError("ws must differ from the workspace of sim")
+    if ws.exists():
+        shutil.rmtree(ws)
+
+    # write a copy of sim to ws and build on the copy, so sim is not changed
+    sim.set_sim_path(ws)
+    sim.write_simulation(silent=True)
+    sim.set_sim_path(sim_ws)
+    sim = flopy.mf6.MFSimulation.load(
+        sim_ws=ws, exe_name=sim.exe_name, write_headers=False, verbosity_level=0
+    )
+    gwf = sim.get_model()
+    ghb = gwf.get_package("ghb")
+    dis = gwf.dis
+
+    # fresh water is 1,000 kg/m³ and gains 0.7 kg/m³ for each kg/m³ of salt
+    if buoyancy:
+        # the density of the sea at each GHB comes from its concentration
+        # auxiliary variable
+        flopy.mf6.ModflowGwfbuy(
+            gwf,
+            denseref=1000.0,
+            nrhospecies=1,
+            packagedata=[(0, 0.7, 0.0, "salt", "concentration")],
+        )
+    else:
+        # equivalent freshwater head at the elevation of each GHB
+        data = ghb.stress_period_data.get_data(0)
+        ratio = (1000.0 + 0.7 * data["concentration"]) / 1000.0
+        data["bhead"] += (ratio - 1.0) * (data["bhead"] - data["elevation"])
+        ghb.stress_period_data.set_data({0: data})
+
+    gwt = flopy.mf6.ModflowGwt(sim, modelname="salt")
+    ims_gwt = flopy.mf6.ModflowIms(
+        sim,
+        filename="salt.ims",
+        linear_acceleration="bicgstab",
+        outer_maximum=50,
+        outer_dvclose=1.0e-6,
+        inner_maximum=300,
+        inner_dvclose=1.0e-7,
+    )
+    sim.register_solution_package(ims_gwt, [gwt.name])
+
+    flopy.mf6.ModflowGwtdis(
+        gwt,
+        nlay=dis.nlay.data,
+        nrow=dis.nrow.data,
+        ncol=dis.ncol.data,
+        delr=dis.delr.array,
+        delc=dis.delc.array,
+        top=dis.top.array,
+        botm=dis.botm.array,
+        idomain=dis.idomain.array,
+    )
+    flopy.mf6.ModflowGwtic(gwt, strt=0.0)
+    flopy.mf6.ModflowGwtmst(gwt, porosity=0.25)
+    # upstream weighting, which stays stable in the 16,071-day steady-state step
+    flopy.mf6.ModflowGwtadv(gwt, scheme="upstream")
+    # longitudinal, horizontal transverse, and vertical transverse dispersivity, m
+    flopy.mf6.ModflowGwtdsp(gwt, alh=15.0, ath1=1.5, atv=0.15)
+    # the GHB water takes the concentration listed in its auxiliary variable
+    flopy.mf6.ModflowGwtssm(gwt, sources=[(ghb.package_name, "AUX", "concentration")])
+    flopy.mf6.ModflowGwtoc(
+        gwt,
+        concentration_filerecord="salt.ucn",
+        saverecord=[("CONCENTRATION", "ALL")],
+    )
+    flopy.mf6.ModflowGwfgwt(
+        sim, exgtype="GWF6-GWT6", exgmnamea=gwf.name, exgmnameb=gwt.name
+    )
+    sim.write_simulation(silent=True)
+    return sim
+
+
 def sfr_discharge(ws):
     """Stream discharge out of the model (m3/d, positive) at each output time."""
     df = pd.read_csv(pl.Path(ws) / "sv.sfr.obs.csv", index_col=0)
